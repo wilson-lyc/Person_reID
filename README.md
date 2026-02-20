@@ -49,6 +49,7 @@ Share to
 * [Some News](#some-news)
 * [Trained Model](#trained-model)
 * [Prerequisites](#prerequisites)
+* [Quick Start](#quick-start)
 * [Getting Started](#getting-started)
     * [Installation](#installation)
     * [Dataset Preparation](#dataset--preparation)
@@ -313,6 +314,31 @@ We add one linear layer(bottleneck), one batchnorm layer and relu.
 
 **(Some reports found that updating numpy can arrive the right accuracy. If you only get 50~80 Top1 Accuracy, just try it.)**
 We have successfully run the code based on numpy 1.12.1 and 1.13.1 .
+
+## Quick Start
+
+If your dataset is already prepared at `./Market`, you can follow these steps to quickly train and evaluate:
+
+### 1. Prepare Data
+```bash
+python prepare.py
+```
+*Note: Modify the data path in `prepare.py` if needed. The default expects `./Market`.*
+
+### 2. Train
+```bash
+python train.py --gpu_ids 0 --name ft_ResNet50 --train_all --batchsize 32 --data_dir ./Market/pytorch
+```
+
+### 3. Test
+```bash
+python test.py --gpu_ids 0 --name ft_ResNet50 --test_dir ./Market/pytorch --batchsize 32 --which_epoch last
+```
+
+### 4. Evaluate
+```bash
+python evaluate_gpu.py
+```
 
 ## Getting started
 ### Installation
