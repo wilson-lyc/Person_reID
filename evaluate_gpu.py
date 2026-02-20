@@ -3,6 +3,10 @@ import torch
 import numpy as np
 #import time
 import os
+from lark import send_message, log_info
+from datetime import datetime
+
+run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 #######################################################################
 # Evaluate
@@ -95,7 +99,22 @@ for i in range(len(query_label)):
 
 CMC = CMC.float()
 CMC = CMC/len(query_label) #average CMC
-print('Rank@1:%f Rank@5:%f Rank@10:%f mAP:%f'%(CMC[0],CMC[4],CMC[9],ap/len(query_label)))
+rank1 = CMC[0].item()
+rank5 = CMC[4].item()
+rank10 = CMC[9].item()
+mAP = (ap/len(query_label)).item()
+print('Rank@1:%f Rank@5:%f Rank@10:%f mAP:%f'%(rank1, rank5, rank10, mAP))
+
+# 发送评估结果消息
+send_message("评估完成", f"Run ID: {run_id}\nRank@1: {rank1:.4f}\nmAP: {mAP:.4f}")
+
+# 记录评估日志
+log_info("evaluate_gpu.py", run_id, {
+    "rank1": f"{rank1:.4f}",
+    "rank5": f"{rank5:.4f}",
+    "rank10": f"{rank10:.4f}",
+    "mAP": f"{mAP:.4f}"
+})
 
 # multiple-query
 CMC = torch.IntTensor(len(gallery_label)).zero_()
@@ -114,4 +133,11 @@ if multi:
         #print(i, CMC_tmp[0])
     CMC = CMC.float()
     CMC = CMC/len(query_label) #average CMC
-    print('multi Rank@1:%f Rank@5:%f Rank@10:%f mAP:%f'%(CMC[0],CMC[4],CMC[9],ap/len(query_label)))
+    multi_rank1 = CMC[0].item()
+    multi_rank5 = CMC[4].item()
+    multi_rank10 = CMC[9].item()
+    multi_mAP = (ap/len(query_label)).item()
+    print('multi Rank@1:%f Rank@5:%f Rank@10:%f mAP:%f'%(multi_rank1, multi_rank5, multi_rank10, multi_mAP))
+
+    # 发送多查询评估结果消息
+    send_message("多查询评估完成", f"Run ID: {run_id}\nRank@1: {multi_rank1:.4f}\nmAP: {multi_mAP:.4f}")

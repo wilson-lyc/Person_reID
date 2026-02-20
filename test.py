@@ -21,7 +21,12 @@ from torch.optim import swa_utils
 from tqdm import tqdm
 from model import ft_net, ft_net_dense, ft_net_hr, ft_net_swin, ft_net_swinv2, ft_net_dino, ft_net_efficient, ft_net_NAS, ft_net_convnext, PCB, PCB_test
 from utils import fuse_all_conv_bn
+from lark import send_message, log_info
 version =  torch.__version__
+
+# 生成运行ID
+from datetime import datetime
+run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 ######################################################################
 # Options
@@ -333,6 +338,10 @@ model = fuse_all_conv_bn(model)
 #model = torch.jit.trace(model, dummy_forward_input)
 
 print(model)
+
+# 发送测试开始消息
+send_message("测试开始", f"Run ID: {run_id}\n模型: {opt.name}\n模型文件: {opt.which_epoch}")
+
 # Extract feature
 since = time.time()
 with torch.no_grad():
@@ -350,6 +359,16 @@ scipy.io.savemat('pytorch_result.mat',result)
 print(opt.name)
 result = './model/%s/result.txt'%opt.name
 os.system('python evaluate_gpu.py | tee -a %s'%result)
+
+# 发送测试结束消息
+send_message("测试完成", f"Run ID: {run_id}\n模型: {opt.name}\n结果已保存")
+
+# 记录测试日志
+log_info("test.py", run_id, {
+    "model": opt.name,
+    "which_epoch": opt.which_epoch,
+    "status": "completed"
+})
 
 if opt.multi:
     result = {'mquery_f':mquery_feature.numpy(),'mquery_label':mquery_label,'mquery_cam':mquery_cam}

@@ -27,7 +27,7 @@ from circle_loss import CircleLoss, convert_label_to_similarity
 from instance_loss import InstanceLoss
 from ODFA import ODFA
 from utils import save_network
-from lark import send_message, log_info
+from lark import send_message, log_info, start_monitoring, update_monitoring, stop_monitoring, send_error_notification
 version =  torch.__version__
 
 # 生成运行ID
@@ -471,6 +471,8 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
                     "loss": f"{epoch_loss:.4f}",
                     "acc": f"{epoch_acc:.4f}"
                 })
+                # 更新监控状态
+                update_monitoring()
             if phase == 'train':
                 scheduler.step()
         time_elapsed = time.time() - since
@@ -644,9 +646,19 @@ criterion = nn.CrossEntropyLoss()
 # 发送训练开始消息
 send_message("训练开始", f"Run ID: {run_id}\n模型: {opt.name}\n数据: {data_dir}")
 
-scaler = torch.cuda.amp.GradScaler()
-model = train_model(model, criterion, optimizer_ft, exp_lr_scheduler,
-                       scaler, num_epochs=opt.total_epoch)
+# 启动训练监控
+start_monitoring(run_id, timeout_minutes=15)
 
-# 发送训练结束消息
-send_message("训练完成", f"Run ID: {run_id}\n模型: {opt.name}\n已保存至: {dir_name}")
+scaler = torch.cuda.amp.GradScaler()
+try:
+    model = train_model(model, criterion, optimizer_ft, exp_lr_scheduler,
+                           scaler, num_epochs=opt.total_epoch)
+    # 发送训练结束消息
+    send_message("训练完成", f"Run ID: {run_id}\n模型: {opt.name}\n已保存至: {dir_name}")
+except Exception as e:
+    # 发送训练异常消息
+    send_error_notification(run_id, str(e))
+    raise
+finally:
+    # 停止监控
+    stop_monitoring()
