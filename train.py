@@ -27,7 +27,12 @@ from circle_loss import CircleLoss, convert_label_to_similarity
 from instance_loss import InstanceLoss
 from ODFA import ODFA
 from utils import save_network
+from lark import send_message, log_info
 version =  torch.__version__
+
+# 生成运行ID
+from datetime import datetime
+run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 from pytorch_metric_learning import losses, miners #pip install pytorch-metric-learning
 
 ######################################################################
@@ -460,6 +465,12 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
                     save_network(model, opt.name, epoch+1)
             if phase == 'val':
                 draw_curve(epoch)
+                # 记录日志到飞书
+                log_info("train.py", run_id, {
+                    "epoch": epoch + 1,
+                    "loss": f"{epoch_loss:.4f}",
+                    "acc": f"{epoch_acc:.4f}"
+                })
             if phase == 'train':
                 scheduler.step()
         time_elapsed = time.time() - since
@@ -630,6 +641,12 @@ with open('%s/opts.yaml'%dir_name,'w') as fp:
 
 criterion = nn.CrossEntropyLoss()
 
+# 发送训练开始消息
+send_message("训练开始", f"Run ID: {run_id}\n模型: {opt.name}\n数据: {data_dir}")
+
 scaler = torch.cuda.amp.GradScaler()
 model = train_model(model, criterion, optimizer_ft, exp_lr_scheduler,
                        scaler, num_epochs=opt.total_epoch)
+
+# 发送训练结束消息
+send_message("训练完成", f"Run ID: {run_id}\n模型: {opt.name}\n已保存至: {dir_name}")
