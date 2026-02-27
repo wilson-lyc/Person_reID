@@ -282,11 +282,10 @@ gpu_ids="0"
 read -r -p "Which epoch for test [last]: " which_epoch
 which_epoch="${which_epoch:-last}"
 
-default_run_name="${backbone}_${dataset}_${loss_name}_$(date +%m%d_%H%M%S)"
+run_id="$(python tool/run_id.py)"
+default_run_name="${backbone}_${dataset}_${loss_name}_${run_id}"
 read -r -p "Run name [${default_run_name}]: " run_name
 run_name="${run_name:-$default_run_name}"
-
-run_id="$(python tool/run_id.py)"
 
 clear
 print_banner
