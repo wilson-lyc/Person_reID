@@ -25,11 +25,11 @@ class InstanceLoss(nn.Module):
             counts = torch.bincount(inverse_indices)  # (N,)
             feature = sum_features / counts.view(-1, 1)  # (N, feature_dim)
             if len(unique_ids)==1: #handle extreme case.
-                return 0
+                return feature.new_tensor(0.0)
 
         normed_feature = l2_norm(feature)
         sim1 = torch.mm(normed_feature*self.gamma, torch.t(normed_feature))
-        sim_label = torch.arange(sim1.size(0))
+        sim_label = torch.arange(sim1.size(0), device=sim1.device, dtype=torch.long)
         loss = F.cross_entropy(sim1, sim_label) 
         return loss
 
