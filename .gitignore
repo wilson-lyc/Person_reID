@@ -1,5 +1,7 @@
 # Don't track content of these folders
 outputs/
+Market/
+.vscode/
 model/*
 logs/
 __pycache__/

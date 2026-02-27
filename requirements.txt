@@ -7,3 +7,4 @@ pytorch_metric_learning
 tqdm
 gdown
 matplotlib
+requests

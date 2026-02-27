@@ -27,6 +27,7 @@ from circle_loss import CircleLoss, convert_label_to_similarity
 from instance_loss import InstanceLoss
 from ODFA import ODFA
 from utils import save_network
+from tool.lark import lark_notify
 version =  torch.__version__
 from pytorch_metric_learning import losses, miners #pip install pytorch-metric-learning
 
@@ -223,6 +224,7 @@ def fliplr(img):
 
 def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
     since = time.time()
+    best_val_acc = 0.0
 
     #best_model_wts = model.state_dict()
     #best_acc = 0.0
@@ -250,9 +252,43 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
         criterion_instance = InstanceLoss(gamma = opt.ins_gamma)
     if opt.sphere:
         criterion_sphere = losses.SphereFaceLoss(num_classes=opt.nclasses, embedding_size=embedding_size, margin=4)
+
+    backbone = "resnet50"
+    if opt.PCB:
+        backbone = "PCB"
+    elif opt.use_dense:
+        backbone = "densenet121"
+    elif opt.use_swin:
+        backbone = "swin"
+    elif opt.use_swinv2:
+        backbone = "swinv2"
+    elif opt.use_dino:
+        backbone = "dino"
+    elif opt.use_efficient:
+        backbone = "efficientnet-b4"
+    elif opt.use_NAS:
+        backbone = "NAS"
+    elif opt.use_hr:
+        backbone = "hrnet"
+    elif opt.use_convnext:
+        backbone = "convnext"
+
+    lark_notify(
+        title=f"[Train Start] {name}",
+        msg=(
+            f"run={name}\n"
+            f"backbone={backbone}\n"
+            f"data_dir={data_dir}\n"
+            f"classes={opt.nclasses}, train_samples={dataset_sizes['train']}, val_samples={dataset_sizes['val']}\n"
+            f"epochs={num_epochs}, batchsize={opt.batchsize}, base_lr={opt.lr}, weight_decay={opt.weight_decay}\n"
+            f"gpu_ids={opt.gpu_ids}, fp16={opt.fp16}, bf16={opt.bf16}, cosine={opt.cosine}, wa={opt.wa}"
+        ),
+    )
+
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
         # print('-' * 10)
+        epoch_stats = {}
 
         if opt.wa and wa_flag and epoch >=  num_epochs*0.8:
             wa_flag = False
@@ -451,6 +487,7 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
 
             y_loss[phase].append(epoch_loss)
             y_err[phase].append(1.0-epoch_acc)            
+            epoch_stats[phase] = {"loss": epoch_loss, "acc": epoch_acc}
             # deep copy the model
             if phase == 'val' and epoch%10 == 9:
                 last_model_wts = model.state_dict()
@@ -458,6 +495,8 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
                     save_network(model.module, opt.name, epoch+1)
                 else:
                     save_network(model, opt.name, epoch+1)
+            if phase == 'val' and epoch_acc > best_val_acc:
+                best_val_acc = epoch_acc
             if phase == 'val':
                 draw_curve(epoch)
             if phase == 'train':
@@ -466,6 +505,20 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
         print('Training complete in {:.0f}m {:.0f}s'.format(
             time_elapsed // 60, time_elapsed % 60))
         print()
+        if (epoch + 1) % 20 == 0:
+            current_lr = optimizer.param_groups[0]['lr']
+            train_stat = epoch_stats.get('train', {})
+            val_stat = epoch_stats.get('val', {})
+            lark_notify(
+                title=f"[Train Update] {name} Epoch {epoch + 1}/{num_epochs}",
+                msg=(
+                    f"epoch={epoch + 1}/{num_epochs}, elapsed={int(time_elapsed//60)}m{int(time_elapsed%60)}s\n"
+                    f"lr={current_lr:.6f}\n"
+                    f"train_loss={train_stat.get('loss', 0.0):.4f}, train_acc={train_stat.get('acc', 0.0):.4f}\n"
+                    f"val_loss={val_stat.get('loss', 0.0):.4f}, val_acc={val_stat.get('acc', 0.0):.4f}\n"
+                    f"best_val_acc={best_val_acc:.4f}"
+                ),
+            )
 
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(
@@ -483,6 +536,17 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
          save_network( swa_model, opt.name, 'average')
          swa_utils.update_bn(dataloaders['train'], swa_model, device='cuda:0')
          save_network( swa_model, opt.name, 'average_bn')
+
+    lark_notify(
+        title=f"[Train End] {name}",
+        msg=(
+            f"run={name} finished\n"
+            f"total_time={int(time_elapsed//60)}m{int(time_elapsed%60)}s\n"
+            f"epochs={num_epochs}, best_val_acc={best_val_acc:.4f}\n"
+            f"final_train_loss={y_loss['train'][-1]:.4f}, final_train_acc={1.0-y_err['train'][-1]:.4f}\n"
+            f"final_val_loss={y_loss['val'][-1]:.4f}, final_val_acc={1.0-y_err['val'][-1]:.4f}"
+        ),
+    )
 
     return model
 
