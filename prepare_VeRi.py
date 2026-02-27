@@ -1,3 +1,4 @@
+import argparse
 import os
 from shutil import copyfile
 
@@ -6,8 +7,11 @@ def copy_file(s, t):
         for name in files:
             copyfile(root+'/'+name,t+'/'+name)
 
-# You only need to change this line to your dataset download path
-download_path = './data/VeRi'
+parser = argparse.ArgumentParser(description='Prepare VeRi dataset')
+parser.add_argument('--path', default='./data/VeRi', type=str, help='raw dataset root path')
+opt = parser.parse_args()
+
+download_path = opt.path
 
 if not os.path.isdir(download_path):
     print('please change the download_path')

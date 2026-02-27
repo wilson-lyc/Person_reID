@@ -51,13 +51,22 @@ cd Person_reID
 Then run one-click script:
 ```bash
 chmod +x run.sh
-bash run.sh
+./run.sh
 ```
 
 Dataset behavior in one-click script:
-- If prepared dataset already exists (`train/query/gallery`), it reuses it.
-- For Market-1501 and DukeMTMC-reID, it tries Google Drive download automatically.
-- If Google download fails (network restriction), script stops and prints a manual dataset preparation guide, including `prepare.py --dataset ... --download_path ...` commands.
+- Dataset preparation is executed by dataset-specific `prepare*.py` scripts with `--path`.
+- No auto-download in `run.sh`. Please place raw datasets manually first.
+- Fixed dataset raw paths:
+  - `./data/Market`
+  - `./data/Duke`
+  - `./data/MSMT17`
+  - `./data/CUB`
+  - `./data/VehicleID`
+  - `./data/VeRi`
+  - `./data/VIPeR`
+- Train/test paths are fixed and not editable in `run.sh`:
+  - `<raw_path>/pytorch`
 
 ## Tutorial
 * [8 min Tutorial](https://github.com/layumi/Person_reID_baseline_pytorch/blob/master/tutorial/README.md)，[8分钟教程](https://zhuanlan.zhihu.com/p/50387521)
@@ -356,6 +365,44 @@ python setup.py install --cuda_ext --cpp_ext
 Because pytorch and torchvision are ongoing projects.
 
 Here we noted that our code is tested based on Pytorch 0.3.0/0.4.0/0.5.0/1.0.0 and Torchvision 0.2.0/0.2.1 .
+
+### One-Click Run
+Clone repo first:
+
+```bash
+git clone https://github.com/wilson-lyc/Person_reID
+cd Person_reID
+```
+
+Run interactive pipeline:
+
+```bash
+bash run.sh
+```
+
+What `run.sh` does:
+- Install Python dependencies from `requirements.txt`
+- Prepare dataset by calling dataset-specific scripts:
+  - `prepare.py` (Market)
+  - `prepare_Duke.py` (Duke)
+  - `prepare_MSMT.py` (MSMT17)
+  - `prepare_CUB.py` (CUB)
+  - `prepare_VehicleID.py` (VehicleID)
+  - `prepare_VeRi.py` (VeRi)
+  - `prepare_viper.py` (VIPeR)
+- Train + test using one shared `run_id`
+
+Default dataset raw paths used by `run.sh` (fixed, not editable in script):
+- `./data/Market`
+- `./data/Duke`
+- `./data/MSMT17`
+- `./data/CUB`
+- `./data/VehicleID`
+- `./data/VeRi`
+- `./data/VIPeR`
+
+For each selected dataset, train/test paths are fixed to:
+- `<raw_path>/pytorch`
 
 ### Dataset & Preparation
 

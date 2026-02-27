@@ -1,8 +1,12 @@
+import argparse
 import os
 from shutil import copyfile
 
-# You only need to change this line to your dataset download path
-download_path = '../DukeMTMC-reID'
+parser = argparse.ArgumentParser(description='Prepare DukeMTMC-reID dataset')
+parser.add_argument('--path', default='./data/Duke', type=str, help='raw dataset root path')
+opt = parser.parse_args()
+
+download_path = opt.path
 
 if not os.path.isdir(download_path):
     print('please change the download_path')

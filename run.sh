@@ -19,126 +19,52 @@ cat <<'EOF'
 EOF
 }
 
-extract_zip() {
-  local zip_path="$1"
-  local dest_dir="$2"
-  python -c "import zipfile; zipfile.ZipFile(r'${zip_path}').extractall(r'${dest_dir}')"
-}
-
 print_manual_dataset_tutorial() {
-  local ds="$1"
+  local ds_name="$1"
   local raw_dir="$2"
   local prepared_dir="$3"
+  local prepare_script="$4"
+
   echo
   echo "================ MANUAL DATASET PREPARATION GUIDE ================"
-  echo "Auto-download from Google Drive failed (likely due to network restrictions)."
-  echo "Please prepare the dataset manually, then rerun this script."
-  echo
-  if [[ "$ds" == "market" ]]; then
-    echo "[Dataset] Market-1501"
-    echo "1) Download and extract Market-1501 manually to: $raw_dir"
-    echo "2) Run:"
-    echo "   python prepare.py --dataset market --download_path \"$raw_dir\""
-  elif [[ "$ds" == "duke" ]]; then
-    echo "[Dataset] DukeMTMC-reID"
-    echo "1) Download and extract DukeMTMC-reID manually to: $raw_dir"
-    echo "2) Run:"
-    echo "   python prepare.py --dataset duke --download_path \"$raw_dir\""
-  elif [[ "$ds" == "msmt17" ]]; then
-    echo "[Dataset] MSMT17"
-    echo "1) Download and extract MSMT17 manually to: $raw_dir"
-    echo "2) Run:"
-    echo "   python prepare.py --dataset msmt17 --download_path \"$raw_dir\""
-  else
-    echo "[Dataset] Custom"
-    echo "Please ensure your prepared dataset path includes:"
-    echo "  $prepared_dir/train"
-    echo "  $prepared_dir/query"
-    echo "  $prepared_dir/gallery"
-  fi
-  echo
+  echo "[Dataset] ${ds_name}"
+  echo "Raw path should be: ${raw_dir}"
+  echo "Run prepare command:"
+  echo "  python ${prepare_script} --path \"${raw_dir}\""
   echo "Expected prepared path:"
-  echo "  $prepared_dir"
+  echo "  ${prepared_dir}"
+  echo "If training/test still fails, please check folder structure under:"
+  echo "  ${prepared_dir}"
   echo "=================================================================="
   echo
 }
 
 ensure_dataset_ready() {
-  local ds="$1"
-  local prepared_dir="$2"
-  local raw_dir="$3"
+  local ds_name="$1"
+  local raw_dir="$2"
+  local prepared_dir="$3"
+  local prepare_script="$4"
 
-  if [[ -d "${prepared_dir}/train" && -d "${prepared_dir}/query" && -d "${prepared_dir}/gallery" ]]; then
-    echo "Prepared dataset already exists: ${prepared_dir}"
-    return 0
-  fi
-
-  if [[ "$ds" == "market" ]]; then
-    if [[ ! -d "$raw_dir" && ! -d "./Market-1501-v15.09.15" ]]; then
-      echo "Market-1501 not found locally. Downloading from Google Drive..."
-      if ! python -m gdown "https://drive.google.com/uc?id=0B8-rUzbwVRk0c054eEozWG9COHM" -O "./Market-1501-v15.09.15.zip"; then
-        print_manual_dataset_tutorial "$ds" "$raw_dir" "$prepared_dir"
-        return 1
-      fi
-      if ! extract_zip "./Market-1501-v15.09.15.zip" "."; then
-        print_manual_dataset_tutorial "$ds" "$raw_dir" "$prepared_dir"
-        return 1
-      fi
-    fi
-    echo "Preparing Market-1501..."
-    if ! python prepare.py --dataset market --download_path "$raw_dir"; then
-      print_manual_dataset_tutorial "$ds" "$raw_dir" "$prepared_dir"
-      return 1
-    fi
-    return 0
-  fi
-
-  if [[ "$ds" == "duke" ]]; then
-    if [[ ! -d "$raw_dir" ]]; then
-      echo "DukeMTMC-reID not found locally. Downloading from Google Drive..."
-      if ! python -m gdown "https://drive.google.com/uc?id=1jjE85dRCMOgRtvJ5RQV9-Afs-2_5dY3O" -O "./DukeMTMC-reID.zip"; then
-        print_manual_dataset_tutorial "$ds" "$raw_dir" "$prepared_dir"
-        return 1
-      fi
-      if ! extract_zip "./DukeMTMC-reID.zip" "."; then
-        print_manual_dataset_tutorial "$ds" "$raw_dir" "$prepared_dir"
-        return 1
-      fi
-    fi
-    echo "Preparing DukeMTMC-reID..."
-    if ! python prepare.py --dataset duke --download_path "$raw_dir"; then
-      print_manual_dataset_tutorial "$ds" "$raw_dir" "$prepared_dir"
-      return 1
-    fi
-    return 0
-  fi
-
-  if [[ "$ds" == "msmt17" ]]; then
-    if [[ ! -d "$raw_dir" ]]; then
-      echo "MSMT17 raw dataset not found at: $raw_dir"
-      print_manual_dataset_tutorial "$ds" "$raw_dir" "$prepared_dir"
-      return 1
-    fi
-    echo "Preparing MSMT17..."
-    if ! python prepare.py --dataset msmt17 --download_path "$raw_dir"; then
-      print_manual_dataset_tutorial "$ds" "$raw_dir" "$prepared_dir"
-      return 1
-    fi
-    return 0
-  fi
-
-  if [[ "$ds" == "custom" ]]; then
-    if [[ -d "${prepared_dir}/train" && -d "${prepared_dir}/query" && -d "${prepared_dir}/gallery" ]]; then
-      return 0
-    fi
-    echo "Custom dataset path is missing prepared folders:"
-    echo "  expected: ${prepared_dir}/train, ${prepared_dir}/query, ${prepared_dir}/gallery"
-    print_manual_dataset_tutorial "$ds" "$raw_dir" "$prepared_dir"
+  if [[ ! -d "$raw_dir" ]]; then
+    echo "Dataset raw path not found: ${raw_dir}"
+    print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir" "$prepare_script"
     return 1
   fi
 
-  echo "Unknown dataset key: $ds"
-  return 1
+  echo "Preparing dataset by ${prepare_script} ..."
+  if ! python "$prepare_script" --path "$raw_dir"; then
+    echo "Prepare failed."
+    print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir" "$prepare_script"
+    return 1
+  fi
+
+  if [[ ! -d "$prepared_dir" ]]; then
+    echo "Prepared path not found after prepare: ${prepared_dir}"
+    print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir" "$prepare_script"
+    return 1
+  fi
+
+  return 0
 }
 
 clear
@@ -167,40 +93,32 @@ case "$backbone_choice" in
 esac
 
 echo "Select Dataset:"
-echo "  1) Market-1501 (./Market/pytorch)"
-echo "  2) DukeMTMC-reID (./Duke/pytorch)"
-echo "  3) MSMT17 (./MSMT17/pytorch)"
-echo "  4) Custom path"
+echo "  1) Market-1501      (./data/Market)      -> prepare.py"
+echo "  2) DukeMTMC-reID    (./data/Duke)        -> prepare_Duke.py"
+echo "  3) MSMT17           (./data/MSMT17)      -> prepare_MSMT.py"
+echo "  4) CUB-200-2011     (./data/CUB)         -> prepare_CUB.py"
+echo "  5) VehicleID        (./data/VehicleID)   -> prepare_VehicleID.py"
+echo "  6) VeRi             (./data/VeRi)        -> prepare_VeRi.py"
+echo "  7) VIPeR            (./data/VIPeR)       -> prepare_viper.py"
 read -r -p "Enter dataset number [1]: " dataset_choice
 dataset_choice="${dataset_choice:-1}"
 
 case "$dataset_choice" in
-  1) dataset="market"; raw_data_dir="./Market"; default_data_dir="./Market/pytorch" ;;
-  2) dataset="duke"; raw_data_dir="./DukeMTMC-reID"; default_data_dir="./DukeMTMC-reID/pytorch" ;;
-  3) dataset="msmt17"; raw_data_dir="./MSMT17_V1"; default_data_dir="./MSMT17_V1/pytorch" ;;
-  4)
-    dataset="custom"
-    raw_data_dir=""
-    read -r -p "Input custom data_dir (pytorch format): " default_data_dir
-    if [[ -z "${default_data_dir}" ]]; then
-      echo "Custom data_dir cannot be empty."
-      exit 1
-    fi
-    ;;
+  1) dataset="market";    raw_data_dir="./data/Market";    prepare_script="prepare.py" ;;
+  2) dataset="duke";      raw_data_dir="./data/Duke";      prepare_script="prepare_Duke.py" ;;
+  3) dataset="msmt17";    raw_data_dir="./data/MSMT17";    prepare_script="prepare_MSMT.py" ;;
+  4) dataset="cub";       raw_data_dir="./data/CUB";       prepare_script="prepare_CUB.py" ;;
+  5) dataset="vehicleid"; raw_data_dir="./data/VehicleID"; prepare_script="prepare_VehicleID.py" ;;
+  6) dataset="veri";      raw_data_dir="./data/VeRi";      prepare_script="prepare_VeRi.py" ;;
+  7) dataset="viper";     raw_data_dir="./data/VIPeR";     prepare_script="prepare_viper.py" ;;
   *)
     echo "Invalid dataset number: $dataset_choice"
     exit 1
     ;;
 esac
 
-read -r -p "Train data_dir [${default_data_dir}]: " data_dir
-data_dir="${data_dir:-$default_data_dir}"
-if [[ "$dataset" != "custom" && "$data_dir" != "$default_data_dir" ]]; then
-  raw_data_dir="${data_dir%/pytorch}"
-fi
-
-read -r -p "Test test_dir [${data_dir}]: " test_dir
-test_dir="${test_dir:-$data_dir}"
+data_dir="${raw_data_dir}/pytorch"
+test_dir="$data_dir"
 
 echo "Select Loss:"
 echo "  1) CrossEntropy (baseline)"
@@ -237,15 +155,17 @@ echo "Project codebase: https://github.com/layumi/Person_reID_baseline_pytorch"
 echo
 
 echo "----------------------------------------"
-echo "backbone   : $backbone"
-echo "dataset    : $dataset"
-echo "loss       : $loss_name"
-echo "run_name   : $run_name"
-echo "run_id     : $run_id"
-echo "data_dir   : $data_dir"
-echo "test_dir   : $test_dir"
-echo "gpu_ids    : $gpu_ids"
-echo "which_epoch: $which_epoch"
+echo "backbone      : $backbone"
+echo "dataset       : $dataset"
+echo "prepare_script: $prepare_script"
+echo "raw_data_dir  : $raw_data_dir"
+echo "data_dir      : $data_dir"
+echo "test_dir      : $test_dir"
+echo "loss          : $loss_name"
+echo "run_name      : $run_name"
+echo "run_id        : $run_id"
+echo "gpu_ids       : $gpu_ids"
+echo "which_epoch   : $which_epoch"
 echo "----------------------------------------"
 read -r -p "Confirm and start run? [Y/n]: " confirm_run
 confirm_run="${confirm_run:-Y}"
@@ -268,9 +188,8 @@ test_cmd=(python test.py --gpu_ids "$gpu_ids" --name "$run_name" --test_dir "$te
 echo "[1/4] Installing dependencies from requirements.txt..."
 python -m pip install -r requirements.txt
 
-echo "[2/4] Checking/downloading/preparing dataset..."
-python -m pip install --upgrade gdown
-ensure_dataset_ready "$dataset" "$data_dir" "$raw_data_dir"
+echo "[2/4] Preparing dataset..."
+ensure_dataset_ready "$dataset" "$raw_data_dir" "$data_dir" "$prepare_script"
 
 echo "[3/4] Training..."
 "${train_cmd[@]}"

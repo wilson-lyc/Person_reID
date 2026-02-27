@@ -1,8 +1,12 @@
+import argparse
 import os
 from shutil import copyfile
 
-# You only need to change this line to your dataset download path
-download_path = '/home/zzd/MSMT17_V1/'
+parser = argparse.ArgumentParser(description='Prepare MSMT17 dataset')
+parser.add_argument('--path', default='./data/MSMT17', type=str, help='raw dataset root path')
+opt = parser.parse_args()
+
+download_path = opt.path.rstrip('/\\') + '/'
 
 if not os.path.isdir(download_path):
     print('please change the download_path')

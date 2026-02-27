@@ -1,3 +1,4 @@
+import argparse
 import os
 from shutil import copyfile
 
@@ -6,8 +7,11 @@ def copy_file(s, t):
         for name in files:
             copyfile(root+'/'+name,t+'/'+name)
 
-# You only need to change this line to your dataset download path
-download_path = './data/VehicleID_V1.0/'
+parser = argparse.ArgumentParser(description='Prepare VehicleID dataset')
+parser.add_argument('--path', default='./data/VehicleID', type=str, help='raw dataset root path')
+opt = parser.parse_args()
+
+download_path = opt.path.rstrip('/\\')
 
 if not os.path.isdir(download_path):
     print('please change the download_path')
@@ -19,7 +23,7 @@ train_save_path = download_path + '/pytorch/train_test'
 if not os.path.isdir(train_save_path):
     os.mkdir(train_save_path)
 
-    fname = './data/VehicleID_V1.0/attribute/img2vid.txt'
+    fname = download_path + '/attribute/img2vid.txt'
     with open(fname) as fp:
         for i, line in enumerate(fp):
             name, label = line.split(' ')
@@ -38,7 +42,7 @@ train_list = []
 train_only_save_path = download_path + '/pytorch/train'
 if not os.path.isdir(train_only_save_path):
     os.mkdir(train_only_save_path)
-    with open(download_path+'train_test_split/train_list.txt', 'r') as f:
+    with open(download_path + '/train_test_split/train_list.txt', 'r') as f:
         for name in f:
             name = name.replace('\n','')
             train_ID = name.split(' ')
@@ -59,7 +63,7 @@ for num in [800,1600,2400]:
     if not os.path.isdir(query_save_path):
         os.mkdir(query_save_path)
         os.mkdir(gallery_save_path)
-    with open(download_path+'train_test_split/test_list_%d.txt'%num, 'r') as f:
+    with open(download_path + '/train_test_split/test_list_%d.txt'%num, 'r') as f:
             for name in f:
                 name = name.replace('\n','')
                 val_ID = name.split(' ')
