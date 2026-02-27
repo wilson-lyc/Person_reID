@@ -216,7 +216,7 @@ echo
 echo "Select Backbone:"
 echo "  1) ResNet50 (baseline)"
 echo "  2) ResNet50-IBN"
-echo "  3) DenseNet121"
+echo "  3) DenseNet"
 echo "  4) Swin"
 echo "  5) SwinV2"
 echo "  6) DINOv3"
@@ -232,7 +232,7 @@ backbone_choice="${backbone_choice:-1}"
 case "$backbone_choice" in
   1) backbone="resnet50"; backbone_flags=() ;;
   2) backbone="resnet50_ibn"; backbone_flags=(--ibn) ;;
-  3) backbone="densenet121"; backbone_flags=(--use_dense) ;;
+  3) backbone="densenet"; backbone_flags=(--use_dense) ;;
   4) backbone="swin"; backbone_flags=(--use_swin) ;;
   5) backbone="swinv2"; backbone_flags=(--use_swinv2) ;;
   6) backbone="dino"; backbone_flags=(--use_dino) ;;
@@ -357,11 +357,20 @@ test_cmd=(python test.py --gpu_ids "$gpu_ids" --name "$run_name" --test_dir "$te
 echo "[1/4] Installing dependencies from requirements.txt..."
 python -m pip install -r requirements.txt
 
+clear
+print_banner
+
 echo "[2/4] Preparing dataset..."
 ensure_dataset_ready "$dataset" "$raw_data_dir" "$data_dir" "$prepare_script"
 
+clear
+print_banner
+
 echo "[3/4] Training..."
 "${train_cmd[@]}"
+
+clear
+print_banner
 
 echo "[4/4] Testing..."
 "${test_cmd[@]}"
