@@ -158,13 +158,27 @@ ensure_dataset_ready() {
   local prepare_script="$4"
 
   if ! dataset_has_required_structure "$raw_dir"; then
-    if ! try_auto_download_dataset "$ds_name" "$raw_dir"; then
-      if [[ "$ds_name" == "market" || "$ds_name" == "duke" ]]; then
-        echo "Google Drive auto-download is unavailable for ${ds_name}."
-        echo "Please prepare dataset manually first, then rerun run.sh."
-        print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir" "$prepare_script"
-        exit 1
-      fi
+    if [[ "$ds_name" == "market" || "$ds_name" == "duke" ]]; then
+      echo "Dataset path is missing or incomplete: ${raw_dir}"
+      read -r -p "Do you want to auto-download ${ds_name} from Google Drive? [Y/n]: " auto_download_confirm
+      auto_download_confirm="${auto_download_confirm:-Y}"
+      case "$auto_download_confirm" in
+        Y|y|yes|YES)
+          if ! try_auto_download_dataset "$ds_name" "$raw_dir"; then
+            echo "Google Drive auto-download is unavailable for ${ds_name}."
+            echo "Please prepare dataset manually first, then rerun run.sh."
+            print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir" "$prepare_script"
+            exit 1
+          fi
+          ;;
+        *)
+          echo "Auto-download canceled by user."
+          echo "Please prepare dataset manually first, then rerun run.sh."
+          print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir" "$prepare_script"
+          exit 1
+          ;;
+      esac
+    else
       echo "Dataset raw path not found or incomplete: ${raw_dir}"
       print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir" "$prepare_script"
       return 1
