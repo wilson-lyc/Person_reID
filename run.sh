@@ -392,20 +392,12 @@ test_cmd=(python test.py --gpu_ids "$gpu_ids" --name "$run_name" --test_dir "$te
 echo "[1/4] Installing dependencies from requirements.txt..."
 python -m pip install -r requirements.txt
 
-clear
-print_banner
 
 echo "[2/4] Preparing dataset..."
 ensure_dataset_ready "$dataset" "$raw_data_dir" "$data_dir" "$prepare_script"
 
-clear
-print_banner
-
 echo "[3/4] Training..."
 "${train_cmd[@]}"
-
-clear
-print_banner
 
 echo "[4/4] Testing..."
 "${test_cmd[@]}"
