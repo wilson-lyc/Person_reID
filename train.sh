@@ -86,6 +86,39 @@ ask_yes_no_default_yes() {
   done
 }
 
+dataset_display_name() {
+  local ds_name="$1"
+  case "$ds_name" in
+    market) echo "Market-1501" ;;
+    duke) echo "DukeMTMC-reID" ;;
+    msmt17) echo "MSMT17" ;;
+    cub) echo "CUB-200-2011" ;;
+    vehicleid) echo "VehicleID" ;;
+    veri) echo "VeRi" ;;
+    viper) echo "VIPeR" ;;
+    *) echo "$ds_name" ;;
+  esac
+}
+
+backbone_display_name() {
+  local bb_name="$1"
+  case "$bb_name" in
+    resnet50) echo "ResNet50" ;;
+    resnet50_ibn) echo "ResNet50-IBN" ;;
+    densenet) echo "DenseNet121" ;;
+    swin) echo "Swin" ;;
+    swinv2) echo "SwinV2" ;;
+    dino) echo "DINOv3" ;;
+    efficientnet_b4) echo "EfficientNet-B4" ;;
+    nas) echo "NAS" ;;
+    hrnet) echo "HRNet" ;;
+    convnext) echo "ConvNeXt" ;;
+    pcb) echo "PCB (ResNet50+PCB)" ;;
+    resnet50_usam) echo "ResNet50-USAM" ;;
+    *) echo "$bb_name" ;;
+  esac
+}
+
 # =========================
 # Dataset preparation
 # =========================
@@ -93,10 +126,12 @@ print_manual_dataset_tutorial() {
   local ds_name="$1"
   local raw_dir="$2"
   local prepared_dir="$3"
+  local ds_display
+  ds_display="$(dataset_display_name "$ds_name")"
 
   echo
   echo "================ MANUAL DATASET PREPARATION GUIDE ================"
-  echo "[Dataset] ${ds_name}"
+  echo "[Dataset] ${ds_display} (${ds_name})"
   echo "Raw path should be: ${raw_dir}"
   echo "Please prepare the raw dataset folders/files under the path above."
   echo "Expected prepared path:"
@@ -291,7 +326,7 @@ print_project_info
 select_option_by_number backbone_choice "Select Backbone:" "1" \
   "ResNet50 (baseline, default)" \
   "ResNet50-IBN" \
-  "DenseNet" \
+  "DenseNet121" \
   "Swin" \
   "SwinV2" \
   "DINOv3" \
@@ -320,6 +355,7 @@ case "$backbone_choice" in
     exit 1
     ;;
 esac
+backbone_display="$(backbone_display_name "$backbone")"
 
 # Dataset selection and corresponding prepare script
 select_option_by_number dataset_choice "Select Dataset:" "1" \
@@ -344,6 +380,7 @@ case "$dataset_choice" in
     exit 1
     ;;
 esac
+dataset_display="$(dataset_display_name "$dataset")"
 
 data_dir="${raw_data_dir}/pytorch"
 
@@ -397,8 +434,8 @@ print_banner
 print_project_info
 
 echo "----------------------------------------"
-echo "backbone      : $backbone"
-echo "dataset       : $dataset"
+echo "backbone      : $backbone_display ($backbone)"
+echo "dataset       : $dataset_display ($dataset)"
 echo "prepare_script: $prepare_script"
 echo "raw_data_dir  : $raw_data_dir"
 echo "data_dir      : $data_dir"

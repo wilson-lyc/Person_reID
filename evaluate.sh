@@ -58,15 +58,31 @@ select_option_by_number() {
   printf -v "$__outvar" '%s' "$choice"
 }
 
+dataset_display_name() {
+  local ds_name="$1"
+  case "$ds_name" in
+    market) echo "Market-1501" ;;
+    duke) echo "DukeMTMC-reID" ;;
+    msmt17) echo "MSMT17" ;;
+    cub) echo "CUB-200-2011" ;;
+    vehicleid) echo "VehicleID" ;;
+    veri) echo "VeRi" ;;
+    viper) echo "VIPeR" ;;
+    *) echo "$ds_name" ;;
+  esac
+}
+
 print_manual_dataset_tutorial() {
   local ds_name="$1"
   local raw_dir="$2"
   local prepared_dir="$3"
   local prepare_script="$4"
+  local ds_display
+  ds_display="$(dataset_display_name "$ds_name")"
 
   echo
   echo "================ MANUAL DATASET PREPARATION GUIDE ================"
-  echo "[Dataset] ${ds_name}"
+  echo "[Dataset] ${ds_display} (${ds_name})"
   echo "Raw path should be: ${raw_dir}"
   echo "Run prepare command:"
   echo "  python ${prepare_script} --path \"${raw_dir}\""
@@ -108,7 +124,7 @@ try_auto_download_dataset() {
   local archive_path="${parent_dir}/${archive_name}"
   local tmp_extract_dir="${parent_dir}/.tmp_extract_${ds_name}"
 
-  echo "Dataset missing. Trying Google Drive auto-download for ${ds_name} ..."
+  echo "Dataset missing. Trying Google Drive auto-download for $(dataset_display_name "$ds_name") (${ds_name}) ..."
   mkdir -p "$parent_dir"
 
   echo "Installing gdown (if needed) ..."
@@ -343,8 +359,8 @@ if [[ ! -f "$config_path" ]]; then
 fi
 
 select_option_by_number test_dataset_choice "Select Test Dataset:" "1" \
-  "Market-1501 (auto-download available)" \
-  "DukeMTMC-reID (auto-download available)" \
+  "Market-1501" \
+  "DukeMTMC-reID" \
   "MSMT17" \
   "CUB-200-2011" \
   "VehicleID" \
@@ -353,6 +369,7 @@ select_option_by_number test_dataset_choice "Select Test Dataset:" "1" \
 
 resolve_dataset_config "$test_dataset_choice"
 test_dataset="$selected_dataset"
+test_dataset_display="$(dataset_display_name "$test_dataset")"
 test_raw_data_dir="$selected_raw_data_dir"
 test_prepare_script="$selected_prepare_script"
 test_dir="${test_raw_data_dir}/pytorch"
@@ -392,7 +409,7 @@ echo
 echo "----------------------------------------"
 echo "run_name      : $run_name"
 echo "config_path   : $config_path"
-echo "test_dataset  : $test_dataset"
+echo "test_dataset  : $test_dataset_display ($test_dataset)"
 echo "test_prepare  : $test_prepare_script"
 echo "test_raw_dir  : $test_raw_data_dir"
 echo "test_dir      : $test_dir"
