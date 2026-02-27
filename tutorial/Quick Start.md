@@ -22,3 +22,8 @@ python test.py --gpu_ids 0 --name ft_ResNet50 --test_dir ./Market/pytorch  --bat
 ```bash
 python evaluate_gpu.py
 ```
+
+## Visualization
+```bash
+python demo.py --query_index 777 --test_dir ./Market/pytorch
+```
