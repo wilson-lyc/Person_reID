@@ -3,7 +3,6 @@ import torch
 import numpy as np
 import time
 import os
-from tool.lark import lark_notify, lark_log, generate_run_id
 
 #######################################################################
 # Evaluate
@@ -63,7 +62,6 @@ def compute_mAP(index, good_index, junk_index):
 
 ######################################################################
 result = scipy.io.loadmat('pytorch_result.mat')
-run_id = generate_run_id()
 since = time.time()
 query_feature = torch.FloatTensor(result['query_f'])
 query_cam = result['query_cam'][0]
@@ -73,19 +71,6 @@ gallery_cam = result['gallery_cam'][0]
 gallery_label = result['gallery_label'][0]
 
 multi = os.path.isfile('multi_query.mat')
-
-lark_log(
-    project="Person_reID",
-    file="evaluate_gpu.py",
-    run_id=run_id,
-    log={
-        "event": "eval_start",
-        "result_mat": "pytorch_result.mat",
-        "multi_query_mat_exists": bool(multi),
-        "num_query": int(len(query_label)),
-        "num_gallery": int(len(gallery_label)),
-    },
-)
 
 if multi:
     m_result = scipy.io.loadmat('multi_query.mat')
@@ -145,29 +130,4 @@ if multi:
     print('multi Rank@1:%f Rank@5:%f Rank@10:%f mAP:%f'%(multi_rank1, multi_rank5, multi_rank10, multi_map))
 
 time_elapsed = time.time() - since
-lark_log(
-    project="Person_reID",
-    file="evaluate_gpu.py",
-    run_id=run_id,
-    log={
-        "event": "eval_end",
-        "elapsed_seconds": float(time_elapsed),
-        "rank1": rank1,
-        "rank5": rank5,
-        "rank10": rank10,
-        "mAP": map_score,
-        "has_multi_query": bool(multi),
-        "multi_rank1": multi_rank1,
-        "multi_rank5": multi_rank5,
-        "multi_rank10": multi_rank10,
-        "multi_mAP": multi_map,
-    },
-)
-lark_notify(
-    title="[Eval End] evaluate_gpu.py",
-    msg=(
-        f"rank1={rank1:.4f}, rank5={rank5:.4f}, rank10={rank10:.4f}, mAP={map_score:.4f}\n"
-        f"multi={multi}, multi_mAP={multi_map if multi_map is not None else 'N/A'}\n"
-        f"elapsed={int(time_elapsed//60)}m{time_elapsed%60:.2f}s"
-    ),
-)
+print('Evaluation complete in {:.0f}m {:.2f}s'.format(time_elapsed // 60, time_elapsed % 60))

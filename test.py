@@ -33,6 +33,7 @@ parser.add_argument('--gpu_ids',default='0', type=str,help='gpu_ids: e.g. 0  0,1
 parser.add_argument('--which_epoch',default='last', type=str, help='0,1,2,3...or last')
 parser.add_argument('--test_dir',default='../Market/pytorch',type=str, help='./test_data')
 parser.add_argument('--name', default='ft_ResNet50', type=str, help='save model path')
+parser.add_argument('--run_id', default='', type=str, help='external run id for logging')
 parser.add_argument('--batchsize', default=256, type=int, help='batchsize')
 parser.add_argument('--linear_num', default=512, type=int, help='feature dimension: 512 or default or 0 (linear=False)')
 parser.add_argument('--use_dense', action='store_true', help='use densenet121' )
@@ -44,9 +45,10 @@ parser.add_argument('--fp16', action='store_true', help='use fp16.' )
 parser.add_argument('--ibn', action='store_true', help='use ibn.' )
 parser.add_argument('--usam', action='store_true', help='use usam.' )
 parser.add_argument('--ms',default='1', type=str,help='multiple_scale: e.g. 1 1,1.1  1,1.1,1.2')
+parser.add_argument('--skip_eval', action='store_true', help='skip evaluate_gpu.py in test stage')
 
 opt = parser.parse_args()
-run_id = generate_run_id()
+run_id = opt.run_id if len(opt.run_id) > 0 else generate_run_id()
 ###load config###
 # load the training config
 config_path = os.path.join('./model',opt.name,'opts.yaml')
@@ -380,7 +382,11 @@ scipy.io.savemat('pytorch_result.mat',result)
 print(opt.name)
 result = './model/%s/result.txt'%opt.name
 eval_cmd = 'python evaluate_gpu.py | tee -a %s'%result
-eval_return_code = os.system(eval_cmd)
+eval_return_code = 0
+if opt.skip_eval:
+    print('Skip evaluation in test.py because --skip_eval is set.')
+else:
+    eval_return_code = os.system(eval_cmd)
 
 lark_log(
     project="Person_reID",
@@ -394,6 +400,7 @@ lark_log(
         "result_mat": "pytorch_result.mat",
         "result_txt": result,
         "eval_cmd": eval_cmd,
+        "eval_skipped": bool(opt.skip_eval),
         "eval_return_code": int(eval_return_code),
         "gallery_feature_shape": list(gallery_feature.shape),
         "query_feature_shape": list(query_feature.shape),
@@ -407,6 +414,7 @@ lark_notify(
         f"elapsed={int(time_elapsed//60)}m{time_elapsed%60:.2f}s\n"
         f"result_mat=pytorch_result.mat\n"
         f"result_txt={result}\n"
+        f"eval_skipped={bool(opt.skip_eval)}\n"
         f"evaluate_return={eval_return_code}"
     ),
 )

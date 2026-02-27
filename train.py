@@ -37,6 +37,7 @@ from pytorch_metric_learning import losses, miners #pip install pytorch-metric-l
 parser = argparse.ArgumentParser(description='Training')
 parser.add_argument('--gpu_ids',default='0', type=str,help='gpu_ids: e.g. 0  0,1,2  0,2')
 parser.add_argument('--name',default='ft_ResNet50', type=str, help='output model name')
+parser.add_argument('--run_id', default='', type=str, help='external run id for logging')
 # data
 parser.add_argument('--data_dir',default='../Market/pytorch',type=str, help='training dir path')
 parser.add_argument('--train_all', action='store_true', help='use all training data' )
@@ -84,7 +85,7 @@ parser.add_argument('--adv', default=0.0, type=float, help='add the adversarial 
 parser.add_argument('--aiter', default=10, type=float, help='enable adversarial loss every x iter' )
 
 opt = parser.parse_args()
-run_id = generate_run_id()
+run_id = opt.run_id if len(opt.run_id) > 0 else generate_run_id()
 
 if opt.DG:
     opt.wa = True #DG will enable swa.

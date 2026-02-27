@@ -1,14 +1,10 @@
 import json
-from datetime import datetime
 from urllib import request
+from tool.run_id import generate_run_id
 
 
 WEBHOOK_URL = "https://www.feishu.cn/flow/api/trigger-webhook/0dab5484c669f8dbc898a052f19efad3"
 LARK_LOG_WEBHOOK_URL = "https://www.feishu.cn/flow/api/trigger-webhook/c09f9f2d91646c670e5d1a6b46b81567"
-
-
-def generate_run_id() -> str:
-    return datetime.now().strftime("%m%d_%H%M%S")
 
 
 def _post_json(url: str, payload: dict) -> str:
