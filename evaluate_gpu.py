@@ -1,8 +1,9 @@
 import scipy.io
 import torch
 import numpy as np
-#import time
+import time
 import os
+from tool.lark import lark_notify, lark_log, generate_run_id
 
 #######################################################################
 # Evaluate
@@ -62,6 +63,8 @@ def compute_mAP(index, good_index, junk_index):
 
 ######################################################################
 result = scipy.io.loadmat('pytorch_result.mat')
+run_id = generate_run_id()
+since = time.time()
 query_feature = torch.FloatTensor(result['query_f'])
 query_cam = result['query_cam'][0]
 query_label = result['query_label'][0]
@@ -70,6 +73,19 @@ gallery_cam = result['gallery_cam'][0]
 gallery_label = result['gallery_label'][0]
 
 multi = os.path.isfile('multi_query.mat')
+
+lark_log(
+    project="Person_reID",
+    file="evaluate_gpu.py",
+    run_id=run_id,
+    log={
+        "event": "eval_start",
+        "result_mat": "pytorch_result.mat",
+        "multi_query_mat_exists": bool(multi),
+        "num_query": int(len(query_label)),
+        "num_gallery": int(len(gallery_label)),
+    },
+)
 
 if multi:
     m_result = scipy.io.loadmat('multi_query.mat')
@@ -95,11 +111,19 @@ for i in range(len(query_label)):
 
 CMC = CMC.float()
 CMC = CMC/len(query_label) #average CMC
-print('Rank@1:%f Rank@5:%f Rank@10:%f mAP:%f'%(CMC[0],CMC[4],CMC[9],ap/len(query_label)))
+rank1 = float(CMC[0].item())
+rank5 = float(CMC[4].item())
+rank10 = float(CMC[9].item())
+map_score = float(ap/len(query_label))
+print('Rank@1:%f Rank@5:%f Rank@10:%f mAP:%f'%(rank1, rank5, rank10, map_score))
 
 # multiple-query
 CMC = torch.IntTensor(len(gallery_label)).zero_()
 ap = 0.0
+multi_rank1 = None
+multi_rank5 = None
+multi_rank10 = None
+multi_map = None
 if multi:
     for i in range(len(query_label)):
         mquery_index1 = np.argwhere(mquery_label==query_label[i])
@@ -114,4 +138,36 @@ if multi:
         #print(i, CMC_tmp[0])
     CMC = CMC.float()
     CMC = CMC/len(query_label) #average CMC
-    print('multi Rank@1:%f Rank@5:%f Rank@10:%f mAP:%f'%(CMC[0],CMC[4],CMC[9],ap/len(query_label)))
+    multi_rank1 = float(CMC[0].item())
+    multi_rank5 = float(CMC[4].item())
+    multi_rank10 = float(CMC[9].item())
+    multi_map = float(ap/len(query_label))
+    print('multi Rank@1:%f Rank@5:%f Rank@10:%f mAP:%f'%(multi_rank1, multi_rank5, multi_rank10, multi_map))
+
+time_elapsed = time.time() - since
+lark_log(
+    project="Person_reID",
+    file="evaluate_gpu.py",
+    run_id=run_id,
+    log={
+        "event": "eval_end",
+        "elapsed_seconds": float(time_elapsed),
+        "rank1": rank1,
+        "rank5": rank5,
+        "rank10": rank10,
+        "mAP": map_score,
+        "has_multi_query": bool(multi),
+        "multi_rank1": multi_rank1,
+        "multi_rank5": multi_rank5,
+        "multi_rank10": multi_rank10,
+        "multi_mAP": multi_map,
+    },
+)
+lark_notify(
+    title="[Eval End] evaluate_gpu.py",
+    msg=(
+        f"rank1={rank1:.4f}, rank5={rank5:.4f}, rank10={rank10:.4f}, mAP={map_score:.4f}\n"
+        f"multi={multi}, multi_mAP={multi_map if multi_map is not None else 'N/A'}\n"
+        f"elapsed={int(time_elapsed//60)}m{time_elapsed%60:.2f}s"
+    ),
+)

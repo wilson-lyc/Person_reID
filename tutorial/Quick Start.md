@@ -15,7 +15,7 @@ python train.py --gpu_ids 0 --name ft_ResNet50 --train_all --batchsize 32  --dat
 
 ## Test
 ```bash
-python test.py --gpu_ids 0 --name ft_ResNet50 --test_dir ./Market/pytorch  --batchsize 32 --which_epoch 60
+python test.py --gpu_ids 0 --name ft_ResNet50 --test_dir ./Market/pytorch  --batchsize 32 --which_epoch last
 ```
 
 ## Evaluation
