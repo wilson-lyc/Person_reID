@@ -207,6 +207,39 @@ ensure_dataset_ready() {
   return 0
 }
 
+configure_hf_endpoint_for_hrnet() {
+  local selected_backbone="$1"
+  if [[ "$selected_backbone" != "hrnet" ]]; then
+    return 0
+  fi
+
+  if [[ -n "${HF_ENDPOINT:-}" ]]; then
+    echo "HRNet selected. HF_ENDPOINT is already set to: ${HF_ENDPOINT}"
+    return 0
+  fi
+
+  echo "HRNet selected. Checking direct access to Hugging Face..."
+  if python - <<'PY'
+import sys
+import urllib.request
+
+url = "https://huggingface.co"
+try:
+    with urllib.request.urlopen(url, timeout=5) as resp:
+        status = getattr(resp, "status", 200)
+    # Any non-error HTTP response means endpoint is reachable.
+    sys.exit(0 if 200 <= status < 500 else 1)
+except Exception:
+    sys.exit(1)
+PY
+  then
+    echo "Hugging Face is reachable. Using direct endpoint."
+  else
+    export HF_ENDPOINT="https://hf-mirror.com"
+    echo "Hugging Face is unreachable. Fallback to mirror: ${HF_ENDPOINT}"
+  fi
+}
+
 clear
 print_banner
 echo "Script by Wilson: https://github.com/wilson-lyc"
@@ -346,6 +379,8 @@ case "$confirm_run" in
     exit 0
     ;;
 esac
+
+configure_hf_endpoint_for_hrnet "$backbone"
 
 train_cmd=(python train.py --gpu_ids "$gpu_ids" --name "$run_name" --data_dir "$data_dir" --run_id "$run_id")
 train_cmd+=(--train_all)
