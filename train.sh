@@ -252,7 +252,9 @@ ensure_ibn_checkpoint() {
   local direct_url="https://github.com/XingangPan/IBN-Net/releases/download/v1.0/resnet50_ibn_a-d9d0bb7b.pth"
   local mirror_url="https://ghfast.top/?q=https://github.com/XingangPan/IBN-Net/releases/download/v1.0/resnet50_ibn_a-d9d0bb7b.pth"
   local tmp_path="${checkpoint_path}.tmp"
-  local github_reachable="0"
+  local use_mirror_confirm=""
+  local download_url=""
+  local download_source=""
 
   if [[ -s "$checkpoint_path" ]]; then
     echo "IBN checkpoint already exists: ${checkpoint_path}"
@@ -268,52 +270,22 @@ ensure_ibn_checkpoint() {
     return 1
   fi
 
-  rm -f "$tmp_path"
-  echo "Checking GitHub connectivity (5s timeout)..."
-  if python - <<'PY'
-import sys
-import urllib.request
-
-url = "https://github.com"
-try:
-    request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(request, timeout=5):
-        pass
-    sys.exit(0)
-except Exception:
-    sys.exit(1)
-PY
-  then
-    github_reachable="1"
-    echo "GitHub is reachable. Try direct download first (5s timeout)."
-  else
-    echo "GitHub is unreachable within 5s. Switch to mirror directly."
-  fi
-
-  if [[ "$github_reachable" == "1" ]] && python - "$direct_url" "$tmp_path" <<'PY'
-import shutil
-import sys
-import urllib.request
-
-url = sys.argv[1]
-output = sys.argv[2]
-request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-with urllib.request.urlopen(request, timeout=5) as resp, open(output, "wb") as f:
-    shutil.copyfileobj(resp, f)
-PY
-  then
-    mv "$tmp_path" "$checkpoint_path"
-    echo "IBN checkpoint downloaded from direct URL."
-    return 0
-  fi
+  read -r -p "Use mirror URL for IBN checkpoint download? [Y/n]: " use_mirror_confirm
+  use_mirror_confirm="${use_mirror_confirm:-Y}"
+  case "$use_mirror_confirm" in
+    Y|y|yes|YES)
+      download_url="$mirror_url"
+      download_source="mirror"
+      ;;
+    *)
+      download_url="$direct_url"
+      download_source="direct"
+      ;;
+  esac
 
   rm -f "$tmp_path"
-  if [[ "$github_reachable" == "1" ]]; then
-    echo "Direct download failed or timed out. Trying mirror URL..."
-  else
-    echo "Trying mirror URL..."
-  fi
-  if python - "$mirror_url" "$tmp_path" <<'PY'
+  echo "Downloading IBN checkpoint via ${download_source} URL..."
+  if python - "$download_url" "$tmp_path" <<'PY'
 import shutil
 import sys
 import urllib.request
@@ -326,12 +298,12 @@ with urllib.request.urlopen(request, timeout=120) as resp, open(output, "wb") as
 PY
   then
     mv "$tmp_path" "$checkpoint_path"
-    echo "IBN checkpoint downloaded from mirror URL."
+    echo "IBN checkpoint downloaded from ${download_source} URL."
     return 0
   fi
 
   rm -f "$tmp_path"
-  echo "Failed to download IBN checkpoint."
+  echo "Failed to download IBN checkpoint from ${download_source} URL."
   echo "Please manually download and place file at:"
   echo "  ${checkpoint_path}"
   echo "Direct URL:"
