@@ -166,14 +166,14 @@ ensure_dataset_ready() {
         Y|y|yes|YES)
           if ! try_auto_download_dataset "$ds_name" "$raw_dir"; then
             echo "Google Drive auto-download is unavailable for ${ds_name}."
-            echo "Please prepare dataset manually first, then rerun run.sh."
+            echo "Please prepare dataset manually first, then rerun train.sh."
             print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir" "$prepare_script"
             exit 1
           fi
           ;;
         *)
           echo "Auto-download canceled by user."
-          echo "Please prepare dataset manually first, then rerun run.sh."
+          echo "Please prepare dataset manually first, then rerun train.sh."
           print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir" "$prepare_script"
           exit 1
           ;;
@@ -207,6 +207,39 @@ ensure_dataset_ready() {
   return 0
 }
 
+configure_hf_endpoint_for_hrnet() {
+  local selected_backbone="$1"
+  if [[ "$selected_backbone" != "hrnet" ]]; then
+    return 0
+  fi
+
+  if [[ -n "${HF_ENDPOINT:-}" ]]; then
+    echo "HRNet selected. HF_ENDPOINT is already set to: ${HF_ENDPOINT}"
+    return 0
+  fi
+
+  echo "HRNet selected. Checking direct access to Hugging Face..."
+  if python - <<'PY'
+import sys
+import urllib.request
+
+url = "https://huggingface.co"
+try:
+    with urllib.request.urlopen(url, timeout=5) as resp:
+        status = getattr(resp, "status", 200)
+    # Any non-error HTTP response means endpoint is reachable.
+    sys.exit(0 if 200 <= status < 500 else 1)
+except Exception:
+    sys.exit(1)
+PY
+  then
+    echo "Hugging Face is reachable. Using direct endpoint."
+  else
+    export HF_ENDPOINT="https://hf-mirror.com"
+    echo "Hugging Face is unreachable. Fallback to mirror: ${HF_ENDPOINT}"
+  fi
+}
+
 clear
 print_banner
 echo "Script by Wilson: https://github.com/wilson-lyc"
@@ -216,7 +249,7 @@ echo
 echo "Select Backbone:"
 echo "  1) ResNet50 (baseline)"
 echo "  2) ResNet50-IBN"
-echo "  3) DenseNet121"
+echo "  3) DenseNet"
 echo "  4) Swin"
 echo "  5) SwinV2"
 echo "  6) DINOv3"
@@ -232,7 +265,7 @@ backbone_choice="${backbone_choice:-1}"
 case "$backbone_choice" in
   1) backbone="resnet50"; backbone_flags=() ;;
   2) backbone="resnet50_ibn"; backbone_flags=(--ibn) ;;
-  3) backbone="densenet121"; backbone_flags=(--use_dense) ;;
+  3) backbone="densenet"; backbone_flags=(--use_dense) ;;
   4) backbone="swin"; backbone_flags=(--use_swin) ;;
   5) backbone="swinv2"; backbone_flags=(--use_swinv2) ;;
   6) backbone="dino"; backbone_flags=(--use_dino) ;;
@@ -259,19 +292,27 @@ echo "  7) VIPeR"
 read -r -p "Enter dataset number [1]: " dataset_choice
 dataset_choice="${dataset_choice:-1}"
 
-case "$dataset_choice" in
-  1) dataset="market";    raw_data_dir="./data/Market";    prepare_script="prepare.py" ;;
-  2) dataset="duke";      raw_data_dir="./data/Duke";      prepare_script="prepare_Duke.py" ;;
-  3) dataset="msmt17";    raw_data_dir="./data/MSMT17";    prepare_script="prepare_MSMT.py" ;;
-  4) dataset="cub";       raw_data_dir="./data/CUB";       prepare_script="prepare_CUB.py" ;;
-  5) dataset="vehicleid"; raw_data_dir="./data/VehicleID"; prepare_script="prepare_VehicleID.py" ;;
-  6) dataset="veri";      raw_data_dir="./data/VeRi";      prepare_script="prepare_VeRi.py" ;;
-  7) dataset="viper";     raw_data_dir="./data/VIPeR";     prepare_script="prepare_viper.py" ;;
-  *)
-    echo "Invalid dataset number: $dataset_choice"
-    exit 1
-    ;;
-esac
+resolve_dataset_config() {
+  local choice="$1"
+  case "$choice" in
+    1) selected_dataset="market";    selected_raw_data_dir="./data/Market";    selected_prepare_script="prepare.py" ;;
+    2) selected_dataset="duke";      selected_raw_data_dir="./data/Duke";      selected_prepare_script="prepare_Duke.py" ;;
+    3) selected_dataset="msmt17";    selected_raw_data_dir="./data/MSMT17";    selected_prepare_script="prepare_MSMT.py" ;;
+    4) selected_dataset="cub";       selected_raw_data_dir="./data/CUB";       selected_prepare_script="prepare_CUB.py" ;;
+    5) selected_dataset="vehicleid"; selected_raw_data_dir="./data/VehicleID"; selected_prepare_script="prepare_VehicleID.py" ;;
+    6) selected_dataset="veri";      selected_raw_data_dir="./data/VeRi";      selected_prepare_script="prepare_VeRi.py" ;;
+    7) selected_dataset="viper";     selected_raw_data_dir="./data/VIPeR";     selected_prepare_script="prepare_viper.py" ;;
+    *)
+      echo "Invalid dataset number: $choice"
+      exit 1
+      ;;
+  esac
+}
+
+resolve_dataset_config "$dataset_choice"
+dataset="$selected_dataset"
+raw_data_dir="$selected_raw_data_dir"
+prepare_script="$selected_prepare_script"
 
 data_dir="${raw_data_dir}/pytorch"
 test_dir="$data_dir"
@@ -336,7 +377,7 @@ echo "run_id        : $run_id"
 echo "gpu_ids       : $gpu_ids"
 echo "which_epoch   : $which_epoch"
 echo "----------------------------------------"
-read -r -p "Confirm and start run? [Y/n]: " confirm_run
+read -r -p "Confirm and start train+evaluate workflow? [Y/n]: " confirm_run
 confirm_run="${confirm_run:-Y}"
 case "$confirm_run" in
   Y|y|yes|YES)
@@ -347,6 +388,8 @@ case "$confirm_run" in
     ;;
 esac
 
+configure_hf_endpoint_for_hrnet "$backbone"
+
 train_cmd=(python train.py --gpu_ids "$gpu_ids" --name "$run_name" --data_dir "$data_dir" --run_id "$run_id")
 train_cmd+=(--train_all)
 train_cmd+=("${backbone_flags[@]}")
@@ -356,6 +399,7 @@ test_cmd=(python test.py --gpu_ids "$gpu_ids" --name "$run_name" --test_dir "$te
 
 echo "[1/4] Installing dependencies from requirements.txt..."
 python -m pip install -r requirements.txt
+
 
 echo "[2/4] Preparing dataset..."
 ensure_dataset_ready "$dataset" "$raw_data_dir" "$data_dir" "$prepare_script"

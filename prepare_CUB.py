@@ -75,7 +75,7 @@ for class_name in os.listdir(train_all_path):
 
 print(f'Prepared CUB dataset at: {images_path}')
 
-# export to standard pytorch structure expected by run.sh/train.py/test.py
+# export to standard pytorch structure expected by train.sh/train.py/test.py
 save_path = os.path.join(download_path, 'pytorch')
 train_save = os.path.join(save_path, 'train')
 val_save = os.path.join(save_path, 'val')

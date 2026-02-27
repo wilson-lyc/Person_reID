@@ -48,9 +48,9 @@ git clone https://github.com/wilson-lyc/Person_reID
 cd Person_reID
 ```
 
-Then run one-click script:
+Then run train+evaluate script:
 ```bash
-./run.sh
+./train.sh
 ```
 
 ## Tutorial
@@ -359,13 +359,13 @@ git clone https://github.com/wilson-lyc/Person_reID
 cd Person_reID
 ```
 
-Run interactive pipeline:
+Run interactive train+evaluate pipeline:
 
 ```bash
-bash run.sh
+bash train.sh
 ```
 
-What `run.sh` does:
+What `train.sh` does:
 - Install Python dependencies from `requirements.txt`
 - Prepare dataset by calling dataset-specific scripts:
   - `prepare.py` (Market)
@@ -377,7 +377,7 @@ What `run.sh` does:
   - `prepare_viper.py` (VIPeR)
 - Train + test using one shared `run_id`
 
-Default dataset raw paths used by `run.sh` (fixed, not editable in script):
+Default dataset raw paths used by `train.sh` (fixed, not editable in script):
 - `./data/Market`
 - `./data/Duke`
 - `./data/MSMT17`
@@ -388,6 +388,12 @@ Default dataset raw paths used by `run.sh` (fixed, not editable in script):
 
 For each selected dataset, train/test paths are fixed to:
 - `<raw_path>/pytorch`
+
+Evaluate an existing trained model on a selected test dataset:
+
+```bash
+bash evaluate.sh
+```
 
 ### Dataset & Preparation
 
