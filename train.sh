@@ -6,6 +6,7 @@ cd "$SCRIPT_DIR"
 
 # Copyright:
 # Script built by Wilson: https://github.com/wilson-lyc
+# Co-developed with Codex (OpenAI)
 # Project codebase: https://github.com/layumi/Person_reID_baseline_pytorch
 
 print_banner() {
@@ -240,6 +241,96 @@ PY
   fi
 }
 
+ensure_ibn_checkpoint() {
+  local selected_backbone="$1"
+  if [[ "$selected_backbone" != "resnet50_ibn" ]]; then
+    return 0
+  fi
+
+  local checkpoint_path="/root/.cache/torch/hub/checkpoints/resnet50_ibn_a-d9d0bb7b.pth"
+  local checkpoint_dir
+  checkpoint_dir="$(dirname "$checkpoint_path")"
+  local direct_url="https://github.com/XingangPan/IBN-Net/releases/download/v1.0/resnet50_ibn_a-d9d0bb7b.pth"
+  local mirror_url="https://ghfast.top/?q=https://github.com/XingangPan/IBN-Net/releases/download/v1.0/resnet50_ibn_a-d9d0bb7b.pth"
+  local tmp_path="${checkpoint_path}.tmp"
+  local use_mirror_confirm=""
+  local download_url=""
+  local download_source=""
+
+  if [[ -s "$checkpoint_path" ]]; then
+    echo "IBN checkpoint already exists: ${checkpoint_path}"
+    return 0
+  fi
+
+  echo "ResNet50-IBN selected. Ensuring checkpoint:"
+  echo "  ${checkpoint_path}"
+  if ! mkdir -p "$checkpoint_dir"; then
+    echo "Failed to create checkpoint directory: ${checkpoint_dir}"
+    echo "Please manually place checkpoint at:"
+    echo "  ${checkpoint_path}"
+    return 1
+  fi
+
+  read -r -p "Use mirror URL for IBN checkpoint download? [Y/n]: " use_mirror_confirm
+  use_mirror_confirm="${use_mirror_confirm:-Y}"
+  case "$use_mirror_confirm" in
+    Y|y|yes|YES)
+      download_url="$mirror_url"
+      download_source="mirror"
+      ;;
+    *)
+      download_url="$direct_url"
+      download_source="direct"
+      ;;
+  esac
+
+  rm -f "$tmp_path"
+  echo "Downloading IBN checkpoint via ${download_source} URL..."
+  if command -v curl >/dev/null 2>&1; then
+    # Show progress with curl when available.
+    if curl -L --fail --progress-bar "$download_url" -o "$tmp_path"; then
+      mv "$tmp_path" "$checkpoint_path"
+      echo "IBN checkpoint downloaded from ${download_source} URL."
+      return 0
+    fi
+  elif command -v wget >/dev/null 2>&1; then
+    # Fallback with wget progress display.
+    if wget --show-progress -O "$tmp_path" "$download_url"; then
+      mv "$tmp_path" "$checkpoint_path"
+      echo "IBN checkpoint downloaded from ${download_source} URL."
+      return 0
+    fi
+  elif python - "$download_url" "$tmp_path" <<'PY'
+import shutil
+import sys
+import urllib.request
+
+url = sys.argv[1]
+output = sys.argv[2]
+request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+with urllib.request.urlopen(request, timeout=120) as resp, open(output, "wb") as f:
+    shutil.copyfileobj(resp, f)
+PY
+  then
+    echo "Downloaded by Python fallback (no progress bar shown)."
+    mv "$tmp_path" "$checkpoint_path"
+    echo "IBN checkpoint downloaded from ${download_source} URL."
+    return 0
+  else
+    echo "No curl/wget available, and Python fallback download failed."
+  fi
+
+  rm -f "$tmp_path"
+  echo "Failed to download IBN checkpoint from ${download_source} URL."
+  echo "Please manually download and place file at:"
+  echo "  ${checkpoint_path}"
+  echo "Direct URL:"
+  echo "  ${direct_url}"
+  echo "Mirror URL:"
+  echo "  ${mirror_url}"
+  return 1
+}
+
 clear
 print_banner
 echo "Script by Wilson: https://github.com/wilson-lyc"
@@ -349,6 +440,8 @@ case "$loss_choice" in
 esac
 
 gpu_ids="0"
+read -r -p "GPU ids [0]: " input_gpu_ids
+gpu_ids="${input_gpu_ids:-$gpu_ids}"
 
 read -r -p "Which epoch for test [last]: " which_epoch
 which_epoch="${which_epoch:-last}"
@@ -389,6 +482,7 @@ case "$confirm_run" in
 esac
 
 configure_hf_endpoint_for_hrnet "$backbone"
+ensure_ibn_checkpoint "$backbone"
 
 train_cmd=(python train.py --gpu_ids "$gpu_ids" --name "$run_name" --data_dir "$data_dir" --run_id "$run_id")
 train_cmd+=(--train_all)

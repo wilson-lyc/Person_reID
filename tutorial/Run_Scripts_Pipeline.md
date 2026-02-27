@@ -1,30 +1,44 @@
-# Run Scripts Pipeline
+# 运行脚本流程说明
 
-This document explains the `train.sh` and `evaluate.sh` execution flow.
+本文档说明当前 `train.sh` 与 `evaluate.sh` 的实际执行流程。
 
-## 1) Start
+## 1) 启动方式
 
 ```bash
 git clone https://github.com/wilson-lyc/Person_reID
 cd Person_reID
+```
+
+训练+测试一体流程：
+
+```bash
 bash train.sh
 ```
 
-## 2) Interactive Choices
+仅评估已有模型：
 
-`train.sh` asks user to select:
-- Backbone (`ResNet50`, `ResNet50-IBN`, `DenseNet121`, `Swin`)
-- Dataset (`Market (可自动下载)`, `Duke (可自动下载)`, `MSMT17`, `CUB`, `VehicleID`, `VeRi`, `VIPeR`)
-- Loss (`CE`, `Circle`, `Triplet`)
-- Test epoch and run name
+```bash
+bash evaluate.sh
+```
 
-GPU is fixed to `0`.
+## 2) train.sh（训练+测试一体）
 
-## 3) Dataset Prepare Stage
+### 交互项
 
-`train.sh` calls dataset-specific prepare script with `--path`.
+`train.sh` 会让用户依次选择：
+- Backbone（ResNet50、ResNet50-IBN、DenseNet、Swin、SwinV2、DINOv3、EfficientNet-B4、NAS、HRNet、ConvNeXt、PCB、ResNet50-USAM）
+- Dataset（Market、Duke、MSMT17、CUB、VehicleID、VeRi、VIPeR）
+- Loss（CE、Circle、Triplet、ArcFace、CosFace、Contrast、Instance、Instance-ID、Lifted、Sphere）
+- 测试 epoch（`which_epoch`）
+- 运行名（`run_name`）
 
-Mapping:
+说明：
+- 默认 `gpu_ids=0`（脚本中固定）。
+- 当前 `train.sh` 使用同一个数据集进行训练和测试，不支持在该脚本内分离训练/测试数据集。
+
+### 数据准备映射
+
+`train.sh` 会按数据集调用对应 prepare 脚本：
 - Market -> `python prepare.py --path ./data/Market`
 - Duke -> `python prepare_Duke.py --path ./data/Duke`
 - MSMT17 -> `python prepare_MSMT.py --path ./data/MSMT17`
@@ -33,42 +47,52 @@ Mapping:
 - VeRi -> `python prepare_VeRi.py --path ./data/VeRi`
 - VIPeR -> `python prepare_viper.py --path ./data/VIPeR`
 
-Notes:
-- If dataset is missing and selection is `Market` or `Duke`, `train.sh` will try Google Drive auto-download via `gdown`.
-- For other datasets, raw path must exist before running.
+说明：
+- 若选择 `Market` 或 `Duke` 且原始数据缺失，脚本会询问是否通过 `gdown` 自动下载。
+- 其他数据集需要先手动准备原始目录。
 
-## 4) Fixed Train/Test Paths
+### 固定路径规则
 
-After selecting dataset, both paths are fixed by script:
+选择数据集后路径固定为：
 - `data_dir = <raw_path>/pytorch`
 - `test_dir = <raw_path>/pytorch`
 
-User cannot override these in `train.sh`.
+### 执行阶段
 
-## 5) Execution Pipeline
+确认后依次执行：
+1. 安装依赖：`pip install -r requirements.txt`
+2. 准备数据：调用对应 `prepare*.py`
+3. 训练：`python train.py ... --run_id <same_id>`
+4. 测试：`python test.py ... --run_id <same_id>`
 
-After confirmation, `train.sh` executes:
-1. Install dependencies: `pip install -r requirements.txt`
-2. Prepare dataset via mapped `prepare*.py`
-3. Train: `python train.py ... --run_id <same_id>`
-4. Test: `python test.py ... --run_id <same_id>`
+## 3) evaluate.sh（仅评估）
 
-## 6) Failure Handling
+用于“模型已训练完成、权重已在 `./model` 下”的场景。
 
-If dataset path is missing or prepare fails, script stops and prints:
-- expected raw path
-- corresponding prepare command
-- expected prepared path (`<raw_path>/pytorch`)
+### 模型选择
 
-## 7) Evaluate Only
+脚本会自动扫描 `./model/<run_name>/opts.yaml`，并以编号菜单让用户选择要评估的模型。
 
-`evaluate.sh` is used when model weights already exist under `./model`.
+### 交互项
 
-Interactive steps:
-- Select one existing model directory (detected by `./model/<run_name>/opts.yaml`)
-- Select test dataset
-- Set test options (gpu ids, epoch, batchsize, ms, multi-query)
+选择模型后，会继续询问：
+- 测试数据集（Market、Duke、MSMT17、CUB、VehicleID、VeRi、VIPeR）
+- `gpu_ids`
+- `which_epoch`
+- `batchsize`
+- `ms`（多尺度）
+- 是否启用 `multi-query`
+- 是否 `skip_eval`（只提特征，不执行 `evaluate_gpu.py`）
 
-Pipeline:
-1. Prepare selected test dataset via mapped `prepare*.py`
-2. Evaluate: `python test.py --name <selected_run_name> ...`
+### 执行阶段
+
+确认后依次执行：
+1. 准备测试数据集（调用对应 `prepare*.py`）
+2. 评估：`python test.py --name <selected_run_name> ...`
+
+## 4) 失败处理
+
+当数据目录缺失或 prepare 失败时，脚本会输出：
+- 期望的原始数据路径
+- 对应 prepare 命令
+- 期望的预处理后路径（`<raw_path>/pytorch`）
