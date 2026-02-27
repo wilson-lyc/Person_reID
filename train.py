@@ -27,7 +27,7 @@ from circle_loss import CircleLoss, convert_label_to_similarity
 from instance_loss import InstanceLoss
 from ODFA import ODFA
 from utils import save_network
-from tool.lark import lark_notify, lark_log, generate_run_id
+from tool.lark import lark_notify, lark_log
 version =  torch.__version__
 from pytorch_metric_learning import losses, miners #pip install pytorch-metric-learning
 
@@ -85,7 +85,8 @@ parser.add_argument('--adv', default=0.0, type=float, help='add the adversarial 
 parser.add_argument('--aiter', default=10, type=float, help='enable adversarial loss every x iter' )
 
 opt = parser.parse_args()
-run_id = opt.run_id if len(opt.run_id) > 0 else generate_run_id()
+run_id = opt.run_id
+print(f"[RUN_ID] {run_id}")
 
 if opt.DG:
     opt.wa = True #DG will enable swa.
@@ -279,6 +280,7 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
         title=f"[Train Start] {name}",
         msg=(
             f"run={name}\n"
+            f"run_id={run_id}\n"
             f"backbone={backbone}\n"
             f"data_dir={data_dir}\n"
             f"classes={opt.nclasses}, train_samples={dataset_sizes['train']}, val_samples={dataset_sizes['val']}\n"
@@ -554,6 +556,7 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
             lark_notify(
                 title=f"[Train Update] {name} Epoch {epoch + 1}/{num_epochs}",
                 msg=(
+                    f"run_id={run_id}\n"
                     f"epoch={epoch + 1}/{num_epochs}, elapsed={int(time_elapsed//60)}m{int(time_elapsed%60)}s\n"
                     f"lr={current_lr:.6f}\n"
                     f"train_loss={train_stat.get('loss', 0.0):.4f}, train_acc={train_stat.get('acc', 0.0):.4f}\n"
@@ -583,6 +586,7 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
         title=f"[Train End] {name}",
         msg=(
             f"run={name} finished\n"
+            f"run_id={run_id}\n"
             f"total_time={int(time_elapsed//60)}m{int(time_elapsed%60)}s\n"
             f"epochs={num_epochs}, best_val_acc={best_val_acc:.4f}\n"
             f"final_train_loss={y_loss['train'][-1]:.4f}, final_train_acc={1.0-y_err['train'][-1]:.4f}\n"

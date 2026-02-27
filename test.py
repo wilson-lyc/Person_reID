@@ -21,7 +21,7 @@ from torch.optim import swa_utils
 from tqdm import tqdm
 from model import ft_net, ft_net_dense, ft_net_hr, ft_net_swin, ft_net_swinv2, ft_net_dino, ft_net_efficient, ft_net_NAS, ft_net_convnext, PCB, PCB_test
 from utils import fuse_all_conv_bn
-from tool.lark import lark_notify, lark_log, generate_run_id
+from tool.lark import lark_notify, lark_log
 version =  torch.__version__
 
 ######################################################################
@@ -48,7 +48,8 @@ parser.add_argument('--ms',default='1', type=str,help='multiple_scale: e.g. 1 1,
 parser.add_argument('--skip_eval', action='store_true', help='skip evaluate_gpu.py in test stage')
 
 opt = parser.parse_args()
-run_id = opt.run_id if len(opt.run_id) > 0 else generate_run_id()
+run_id = opt.run_id
+print(f"[RUN_ID] {run_id}")
 ###load config###
 # load the training config
 config_path = os.path.join('./model',opt.name,'opts.yaml')
@@ -161,6 +162,7 @@ lark_notify(
     title=f"[Test Start] {name}",
     msg=(
         f"run={name}\n"
+        f"run_id={run_id}\n"
         f"which_epoch={opt.which_epoch}, test_dir={test_dir}\n"
         f"batchsize={opt.batchsize}, ms={opt.ms}, multi={opt.multi}\n"
         f"gallery_samples={len(image_datasets['gallery'])}, query_samples={len(image_datasets['query'])}"
@@ -411,6 +413,7 @@ lark_notify(
     title=f"[Test End] {name}",
     msg=(
         f"run={name}, which_epoch={opt.which_epoch}\n"
+        f"run_id={run_id}\n"
         f"elapsed={int(time_elapsed//60)}m{time_elapsed%60:.2f}s\n"
         f"result_mat=pytorch_result.mat\n"
         f"result_txt={result}\n"

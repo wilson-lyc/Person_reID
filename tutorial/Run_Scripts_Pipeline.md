@@ -14,7 +14,7 @@ bash run.sh
 
 `run.sh` asks user to select:
 - Backbone (`ResNet50`, `ResNet50-IBN`, `DenseNet121`, `Swin`)
-- Dataset (`Market`, `Duke`, `MSMT17`, `CUB`, `VehicleID`, `VeRi`, `VIPeR`)
+- Dataset (`Market (可自动下载)`, `Duke (可自动下载)`, `MSMT17`, `CUB`, `VehicleID`, `VeRi`, `VIPeR`)
 - Loss (`CE`, `Circle`, `Triplet`)
 - Test epoch and run name
 
@@ -34,8 +34,8 @@ Mapping:
 - VIPeR -> `python prepare_viper.py --path ./data/VIPeR`
 
 Notes:
-- No auto download in `run.sh`.
-- Dataset raw path must exist before running.
+- If dataset is missing and selection is `Market` or `Duke`, `run.sh` will try Google Drive auto-download via `gdown`.
+- For other datasets, raw path must exist before running.
 
 ## 4) Fixed Train/Test Paths
 

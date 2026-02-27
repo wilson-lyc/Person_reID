@@ -39,14 +39,140 @@ print_manual_dataset_tutorial() {
   echo
 }
 
+dataset_has_required_structure() {
+  local path="$1"
+  [[ -d "${path}/query" && -d "${path}/bounding_box_train" && -d "${path}/bounding_box_test" ]]
+}
+
+try_auto_download_dataset() {
+  local ds_name="$1"
+  local raw_dir="$2"
+  local file_id=""
+  local archive_name=""
+
+  case "$ds_name" in
+    market)
+      file_id="0B8-rUzbwVRk0c054eEozWG9COHM"
+      archive_name="Market-1501-v15.09.15.zip"
+      ;;
+    duke)
+      file_id="1jjE85dRCMOgRtvJ5RQV9-Afs-2_5dY3O"
+      archive_name="DukeMTMC-reID.zip"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+
+  local parent_dir
+  parent_dir="$(dirname "$raw_dir")"
+  local archive_path="${parent_dir}/${archive_name}"
+  local tmp_extract_dir="${parent_dir}/.tmp_extract_${ds_name}"
+
+  echo "Dataset missing. Trying Google Drive auto-download for ${ds_name} ..."
+  mkdir -p "$parent_dir"
+
+  echo "Installing gdown (if needed) ..."
+  if ! python -m pip install gdown; then
+    echo "Auto-download failed: unable to install gdown."
+    return 2
+  fi
+
+  echo "Downloading archive to ${archive_path} ..."
+  if ! python -m gdown --id "$file_id" --output "$archive_path"; then
+    echo "Auto-download failed: cannot access Google Drive or download was blocked."
+    return 2
+  fi
+
+  echo "Extracting and normalizing dataset layout ..."
+  if ! python - "$raw_dir" "$archive_path" "$tmp_extract_dir" <<'PY'
+import shutil
+import sys
+import tarfile
+import zipfile
+from pathlib import Path
+
+raw_dir = Path(sys.argv[1]).resolve()
+archive_path = Path(sys.argv[2]).resolve()
+tmp_extract_dir = Path(sys.argv[3]).resolve()
+
+required = {"query", "bounding_box_train", "bounding_box_test"}
+
+if tmp_extract_dir.exists():
+    shutil.rmtree(tmp_extract_dir)
+tmp_extract_dir.mkdir(parents=True, exist_ok=True)
+
+if archive_path.suffix.lower() == ".zip":
+    with zipfile.ZipFile(archive_path, "r") as zf:
+        zf.extractall(tmp_extract_dir)
+elif archive_path.suffix.lower() in {".tar", ".gz", ".tgz", ".bz2", ".xz"}:
+    with tarfile.open(archive_path, "r:*") as tf:
+        tf.extractall(tmp_extract_dir)
+else:
+    raise RuntimeError(f"Unsupported archive format: {archive_path}")
+
+def is_raw_root(path: Path) -> bool:
+    if not path.is_dir():
+        return False
+    names = {p.name for p in path.iterdir() if p.is_dir()}
+    return required.issubset(names)
+
+candidate = None
+if is_raw_root(tmp_extract_dir):
+    candidate = tmp_extract_dir
+else:
+    for p in tmp_extract_dir.rglob("*"):
+        if is_raw_root(p):
+            candidate = p
+            break
+
+if candidate is None:
+    raise RuntimeError(
+        f"Failed to locate dataset root after extracting {archive_path}. "
+        f"Expected folders: {sorted(required)}"
+    )
+
+raw_dir.mkdir(parents=True, exist_ok=True)
+for item in candidate.iterdir():
+    dst = raw_dir / item.name
+    if dst.exists():
+        if dst.is_dir():
+            shutil.rmtree(dst)
+        else:
+            dst.unlink()
+    shutil.move(str(item), str(dst))
+
+shutil.rmtree(tmp_extract_dir, ignore_errors=True)
+print(f"Dataset prepared at: {raw_dir}")
+PY
+  then
+    echo "Auto-download failed: archive extraction/normalization error."
+    return 2
+  fi
+}
+
 ensure_dataset_ready() {
   local ds_name="$1"
   local raw_dir="$2"
   local prepared_dir="$3"
   local prepare_script="$4"
 
-  if [[ ! -d "$raw_dir" ]]; then
-    echo "Dataset raw path not found: ${raw_dir}"
+  if ! dataset_has_required_structure "$raw_dir"; then
+    if ! try_auto_download_dataset "$ds_name" "$raw_dir"; then
+      if [[ "$ds_name" == "market" || "$ds_name" == "duke" ]]; then
+        echo "Google Drive auto-download is unavailable for ${ds_name}."
+        echo "Please prepare dataset manually first, then rerun run.sh."
+        print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir" "$prepare_script"
+        exit 1
+      fi
+      echo "Dataset raw path not found or incomplete: ${raw_dir}"
+      print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir" "$prepare_script"
+      return 1
+    fi
+  fi
+
+  if ! dataset_has_required_structure "$raw_dir"; then
+    echo "Dataset raw path is still incomplete after auto-download: ${raw_dir}"
     print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir" "$prepare_script"
     return 1
   fi
@@ -93,8 +219,8 @@ case "$backbone_choice" in
 esac
 
 echo "Select Dataset:"
-echo "  1) Market-1501      (./data/Market)      -> prepare.py"
-echo "  2) DukeMTMC-reID    (./data/Duke)        -> prepare_Duke.py"
+echo "  1) Market-1501      (./data/Market)      -> prepare.py (auto-download available)"
+echo "  2) DukeMTMC-reID    (./data/Duke)        -> prepare_Duke.py (auto-download available)"
 echo "  3) MSMT17           (./data/MSMT17)      -> prepare_MSMT.py"
 echo "  4) CUB-200-2011     (./data/CUB)         -> prepare_CUB.py"
 echo "  5) VehicleID        (./data/VehicleID)   -> prepare_VehicleID.py"
