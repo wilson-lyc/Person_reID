@@ -240,6 +240,82 @@ PY
   fi
 }
 
+ensure_ibn_checkpoint() {
+  local selected_backbone="$1"
+  if [[ "$selected_backbone" != "resnet50_ibn" ]]; then
+    return 0
+  fi
+
+  local checkpoint_path="/root/.cache/torch/hub/checkpoints/resnet50_ibn_a-d9d0bb7b.pth"
+  local checkpoint_dir
+  checkpoint_dir="$(dirname "$checkpoint_path")"
+  local direct_url="https://github.com/XingangPan/IBN-Net/releases/download/v1.0/resnet50_ibn_a-d9d0bb7b.pth"
+  local mirror_url="https://ghfast.top/?q=https://github.com/XingangPan/IBN-Net/releases/download/v1.0/resnet50_ibn_a-d9d0bb7b.pth"
+  local tmp_path="${checkpoint_path}.tmp"
+
+  if [[ -s "$checkpoint_path" ]]; then
+    echo "IBN checkpoint already exists: ${checkpoint_path}"
+    return 0
+  fi
+
+  echo "ResNet50-IBN selected. Ensuring checkpoint:"
+  echo "  ${checkpoint_path}"
+  if ! mkdir -p "$checkpoint_dir"; then
+    echo "Failed to create checkpoint directory: ${checkpoint_dir}"
+    echo "Please manually place checkpoint at:"
+    echo "  ${checkpoint_path}"
+    return 1
+  fi
+
+  rm -f "$tmp_path"
+  echo "Trying direct download..."
+  if python - "$direct_url" "$tmp_path" <<'PY'
+import shutil
+import sys
+import urllib.request
+
+url = sys.argv[1]
+output = sys.argv[2]
+request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+with urllib.request.urlopen(request, timeout=120) as resp, open(output, "wb") as f:
+    shutil.copyfileobj(resp, f)
+PY
+  then
+    mv "$tmp_path" "$checkpoint_path"
+    echo "IBN checkpoint downloaded from direct URL."
+    return 0
+  fi
+
+  rm -f "$tmp_path"
+  echo "Direct download failed. Trying mirror URL..."
+  if python - "$mirror_url" "$tmp_path" <<'PY'
+import shutil
+import sys
+import urllib.request
+
+url = sys.argv[1]
+output = sys.argv[2]
+request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+with urllib.request.urlopen(request, timeout=120) as resp, open(output, "wb") as f:
+    shutil.copyfileobj(resp, f)
+PY
+  then
+    mv "$tmp_path" "$checkpoint_path"
+    echo "IBN checkpoint downloaded from mirror URL."
+    return 0
+  fi
+
+  rm -f "$tmp_path"
+  echo "Failed to download IBN checkpoint."
+  echo "Please manually download and place file at:"
+  echo "  ${checkpoint_path}"
+  echo "Direct URL:"
+  echo "  ${direct_url}"
+  echo "Mirror URL:"
+  echo "  ${mirror_url}"
+  return 1
+}
+
 clear
 print_banner
 echo "Script by Wilson: https://github.com/wilson-lyc"
@@ -391,6 +467,7 @@ case "$confirm_run" in
 esac
 
 configure_hf_endpoint_for_hrnet "$backbone"
+ensure_ibn_checkpoint "$backbone"
 
 train_cmd=(python train.py --gpu_ids "$gpu_ids" --name "$run_name" --data_dir "$data_dir" --run_id "$run_id")
 train_cmd+=(--train_all)
