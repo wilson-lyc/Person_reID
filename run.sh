@@ -218,6 +218,14 @@ echo "  1) ResNet50 (baseline)"
 echo "  2) ResNet50-IBN"
 echo "  3) DenseNet121"
 echo "  4) Swin"
+echo "  5) SwinV2"
+echo "  6) DINOv3"
+echo "  7) EfficientNet-B4"
+echo "  8) NAS"
+echo "  9) HRNet"
+echo "  10) ConvNeXt"
+echo "  11) PCB (ResNet50+PCB)"
+echo "  12) ResNet50-USAM"
 read -r -p "Enter backbone number [1]: " backbone_choice
 backbone_choice="${backbone_choice:-1}"
 
@@ -226,6 +234,14 @@ case "$backbone_choice" in
   2) backbone="resnet50_ibn"; backbone_flags=(--ibn) ;;
   3) backbone="densenet121"; backbone_flags=(--use_dense) ;;
   4) backbone="swin"; backbone_flags=(--use_swin) ;;
+  5) backbone="swinv2"; backbone_flags=(--use_swinv2) ;;
+  6) backbone="dino"; backbone_flags=(--use_dino) ;;
+  7) backbone="efficientnet_b4"; backbone_flags=(--use_efficient) ;;
+  8) backbone="nas"; backbone_flags=(--use_NAS) ;;
+  9) backbone="hrnet"; backbone_flags=(--use_hr) ;;
+  10) backbone="convnext"; backbone_flags=(--use_convnext) ;;
+  11) backbone="pcb"; backbone_flags=(--PCB) ;;
+  12) backbone="resnet50_usam"; backbone_flags=(--usam) ;;
   *)
     echo "Invalid backbone number: $backbone_choice"
     exit 1
@@ -264,6 +280,13 @@ echo "Select Loss:"
 echo "  1) CrossEntropy (baseline)"
 echo "  2) Circle Loss (+CE, warm_epoch=5)"
 echo "  3) Triplet Loss (+CE)"
+echo "  4) ArcFace Loss (+CE)"
+echo "  5) CosFace Loss (+CE)"
+echo "  6) Contrast Loss (+CE)"
+echo "  7) Instance Loss (+CE)"
+echo "  8) Instance-ID Loss (+CE)"
+echo "  9) Lifted Loss (+CE)"
+echo "  10) Sphere Loss (+CE)"
 read -r -p "Enter loss number [1]: " loss_choice
 loss_choice="${loss_choice:-1}"
 
@@ -271,6 +294,13 @@ case "$loss_choice" in
   1) loss_name="ce"; loss_flags=() ;;
   2) loss_name="circle"; loss_flags=(--circle --warm_epoch 5) ;;
   3) loss_name="triplet"; loss_flags=(--triplet) ;;
+  4) loss_name="arcface"; loss_flags=(--arcface) ;;
+  5) loss_name="cosface"; loss_flags=(--cosface) ;;
+  6) loss_name="contrast"; loss_flags=(--contrast) ;;
+  7) loss_name="instance"; loss_flags=(--instance) ;;
+  8) loss_name="instance_id"; loss_flags=(--instance_id) ;;
+  9) loss_name="lifted"; loss_flags=(--lifted) ;;
+  10) loss_name="sphere"; loss_flags=(--sphere) ;;
   *)
     echo "Invalid loss number: $loss_choice"
     exit 1
