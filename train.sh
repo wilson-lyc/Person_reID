@@ -29,58 +29,42 @@ print_project_info() {
   echo
 }
 
-# Interactive menu helper: move with Up/Down keys, confirm with Enter.
-select_with_arrows() {
+select_option_by_number() {
   local __outvar="$1"
-  shift
-  local prompt="$1"
-  shift
+  local title="$2"
+  local default_choice="$3"
+  shift 3
   local options=("$@")
-  local selected=0
-  local key=""
+  local choice=""
+  local selected_idx=0
+  local selected_text=""
+  local input_prompt="Enter choice [${default_choice}]: "
 
-  if [[ "${#options[@]}" -eq 0 ]]; then
-    echo "No options provided for prompt: ${prompt}"
-    return 1
-  fi
-
-  if [[ ! -t 0 || ! -t 1 ]]; then
-    echo "${prompt}"
-    echo "${options[0]}"
-    printf -v "$__outvar" '%d' 1
-    return 0
-  fi
-
-  echo "${prompt}"
-  while true; do
-    for i in "${!options[@]}"; do
-      if (( i == selected )); then
-        printf " > %s\n" "${options[$i]}"
-      else
-        printf "   %s\n" "${options[$i]}"
-      fi
-    done
-
-    IFS= read -rsn1 key
-    case "$key" in
-      $'\x1b')
-        IFS= read -rsn2 key
-        case "$key" in
-          '[A') ((selected = (selected - 1 + ${#options[@]}) % ${#options[@]})) ;;
-          '[B') ((selected = (selected + 1) % ${#options[@]})) ;;
-        esac
-        ;;
-      "")
-        printf "\033[%dA" "${#options[@]}"
-        printf "\033[J"
-        printf "%s\n" "${options[$selected]}"
-        printf -v "$__outvar" '%d' "$((selected + 1))"
-        return 0
-        ;;
-    esac
-
-    printf "\033[%dA" "${#options[@]}"
+  echo "$title"
+  for i in "${!options[@]}"; do
+    printf "  %d) %s\n" "$((i + 1))" "${options[$i]}"
   done
+
+  while true; do
+    read -r -p "${input_prompt}" choice
+    choice="${choice:-$default_choice}"
+    if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#options[@]} )); then
+      selected_idx=$((choice - 1))
+      selected_text="${options[$selected_idx]}"
+      break
+    fi
+    if [[ -t 1 ]]; then
+      printf "\033[1A\r\033[2K"
+    fi
+    input_prompt="Invalid choice (${choice}). Enter choice [${default_choice}]: "
+  done
+
+  if [[ -t 1 ]]; then
+    printf "\033[%dA" "$(( ${#options[@]} + 2 ))"
+    printf "\033[J"
+  fi
+  echo "${title} ${selected_text}"
+  printf -v "$__outvar" '%s' "$choice"
 }
 
 # Prompt helper: only accept `Y` or `n` (empty input defaults to `Y`).
@@ -304,21 +288,19 @@ print_banner
 print_project_info
 
 # Backbone selection
-backbone_options=(
-  "1) ResNet50 (baseline, default)"
-  "2) ResNet50-IBN"
-  "3) DenseNet"
-  "4) Swin"
-  "5) SwinV2"
-  "6) DINOv3"
-  "7) EfficientNet-B4"
-  "8) NAS"
-  "9) HRNet"
-  "10) ConvNeXt"
-  "11) PCB (ResNet50+PCB)"
-  "12) ResNet50-USAM"
-)
-select_with_arrows backbone_choice "Select Backbone (use Up/Down and Enter):" "${backbone_options[@]}"
+select_option_by_number backbone_choice "Select Backbone:" "1" \
+  "ResNet50 (baseline, default)" \
+  "ResNet50-IBN" \
+  "DenseNet" \
+  "Swin" \
+  "SwinV2" \
+  "DINOv3" \
+  "EfficientNet-B4" \
+  "NAS" \
+  "HRNet" \
+  "ConvNeXt" \
+  "PCB (ResNet50+PCB)" \
+  "ResNet50-USAM"
 
 case "$backbone_choice" in
   1) backbone="resnet50"; backbone_flags=() ;;
@@ -340,16 +322,14 @@ case "$backbone_choice" in
 esac
 
 # Dataset selection and corresponding prepare script
-dataset_options=(
-  "1) Market-1501 (default)"
-  "2) DukeMTMC-reID"
-  "3) MSMT17"
-  "4) CUB-200-2011"
-  "5) VehicleID"
-  "6) VeRi"
-  "7) VIPeR"
-)
-select_with_arrows dataset_choice "Select Dataset (use Up/Down and Enter):" "${dataset_options[@]}"
+select_option_by_number dataset_choice "Select Dataset:" "1" \
+  "Market-1501 (default)" \
+  "DukeMTMC-reID" \
+  "MSMT17" \
+  "CUB-200-2011" \
+  "VehicleID" \
+  "VeRi" \
+  "VIPeR"
 
 case "$dataset_choice" in
   1) dataset="market";    raw_data_dir="./data/Market";    prepare_script="prepare.py" ;;
@@ -368,19 +348,17 @@ esac
 data_dir="${raw_data_dir}/pytorch"
 
 # Loss selection
-loss_options=(
-  "1) CrossEntropy (default)"
-  "2) Circle"
-  "3) Triplet"
-  "4) ArcFace"
-  "5) CosFace"
-  "6) Contrast"
-  "7) Instance"
-  "8) Instance-ID"
-  "9) Lifted"
-  "10) Sphere"
-)
-select_with_arrows loss_choice "Select Loss (use Up/Down and Enter):" "${loss_options[@]}"
+select_option_by_number loss_choice "Select Loss:" "1" \
+  "CrossEntropy (default)" \
+  "Circle" \
+  "Triplet" \
+  "ArcFace" \
+  "CosFace" \
+  "Contrast" \
+  "Instance" \
+  "Instance-ID" \
+  "Lifted" \
+  "Sphere"
 
 case "$loss_choice" in
   1) loss_name="ce"; loss_flags=() ;;
