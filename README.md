@@ -50,23 +50,8 @@ cd Person_reID
 
 Then run one-click script:
 ```bash
-chmod +x run.sh
 ./run.sh
 ```
-
-Dataset behavior in one-click script:
-- Dataset preparation is executed by dataset-specific `prepare*.py` scripts with `--path`.
-- No auto-download in `run.sh`. Please place raw datasets manually first.
-- Fixed dataset raw paths:
-  - `./data/Market`
-  - `./data/Duke`
-  - `./data/MSMT17`
-  - `./data/CUB`
-  - `./data/VehicleID`
-  - `./data/VeRi`
-  - `./data/VIPeR`
-- Train/test paths are fixed and not editable in `run.sh`:
-  - `<raw_path>/pytorch`
 
 ## Tutorial
 * [8 min Tutorial](https://github.com/layumi/Person_reID_baseline_pytorch/blob/master/tutorial/README.md)，[8分钟教程](https://zhuanlan.zhihu.com/p/50387521)
