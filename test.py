@@ -21,6 +21,7 @@ from torch.optim import swa_utils
 from tqdm import tqdm
 from model import ft_net, ft_net_dense, ft_net_hr, ft_net_swin, ft_net_swinv2, ft_net_dino, ft_net_efficient, ft_net_NAS, ft_net_convnext, PCB, PCB_test
 from utils import fuse_all_conv_bn
+from tool.lark import lark_notify, lark_log, generate_run_id
 version =  torch.__version__
 
 ######################################################################
@@ -45,6 +46,7 @@ parser.add_argument('--usam', action='store_true', help='use usam.' )
 parser.add_argument('--ms',default='1', type=str,help='multiple_scale: e.g. 1 1,1.1  1,1.1,1.2')
 
 opt = parser.parse_args()
+run_id = generate_run_id()
 ###load config###
 # load the training config
 config_path = os.path.join('./model',opt.name,'opts.yaml')
@@ -152,6 +154,34 @@ else:
                                              shuffle=False, num_workers=16) for x in ['gallery','query']}
 class_names = image_datasets['query'].classes
 use_gpu = torch.cuda.is_available()
+
+lark_notify(
+    title=f"[Test Start] {name}",
+    msg=(
+        f"run={name}\n"
+        f"which_epoch={opt.which_epoch}, test_dir={test_dir}\n"
+        f"batchsize={opt.batchsize}, ms={opt.ms}, multi={opt.multi}\n"
+        f"gallery_samples={len(image_datasets['gallery'])}, query_samples={len(image_datasets['query'])}"
+    ),
+)
+lark_log(
+    project="Person_reID",
+    file="test.py",
+    run_id=run_id,
+    log={
+        "event": "test_start",
+        "run_name": name,
+        "which_epoch": opt.which_epoch,
+        "test_dir": test_dir,
+        "batchsize": opt.batchsize,
+        "ms": opt.ms,
+        "multi_query": bool(opt.multi),
+        "gallery_samples": len(image_datasets["gallery"]),
+        "query_samples": len(image_datasets["query"]),
+        "multi_query_samples": len(image_datasets["multi-query"]) if opt.multi else 0,
+        "gpu_ids": gpu_ids,
+    },
+)
 
 ######################################################################
 # Load model
@@ -349,7 +379,37 @@ scipy.io.savemat('pytorch_result.mat',result)
 
 print(opt.name)
 result = './model/%s/result.txt'%opt.name
-os.system('python evaluate_gpu.py | tee -a %s'%result)
+eval_cmd = 'python evaluate_gpu.py | tee -a %s'%result
+eval_return_code = os.system(eval_cmd)
+
+lark_log(
+    project="Person_reID",
+    file="test.py",
+    run_id=run_id,
+    log={
+        "event": "test_end",
+        "run_name": name,
+        "which_epoch": opt.which_epoch,
+        "elapsed_seconds": float(time_elapsed),
+        "result_mat": "pytorch_result.mat",
+        "result_txt": result,
+        "eval_cmd": eval_cmd,
+        "eval_return_code": int(eval_return_code),
+        "gallery_feature_shape": list(gallery_feature.shape),
+        "query_feature_shape": list(query_feature.shape),
+        "multi_query": bool(opt.multi),
+    },
+)
+lark_notify(
+    title=f"[Test End] {name}",
+    msg=(
+        f"run={name}, which_epoch={opt.which_epoch}\n"
+        f"elapsed={int(time_elapsed//60)}m{time_elapsed%60:.2f}s\n"
+        f"result_mat=pytorch_result.mat\n"
+        f"result_txt={result}\n"
+        f"evaluate_return={eval_return_code}"
+    ),
+)
 
 if opt.multi:
     result = {'mquery_f':mquery_feature.numpy(),'mquery_label':mquery_label,'mquery_cam':mquery_cam}
