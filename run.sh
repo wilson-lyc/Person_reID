@@ -233,13 +233,13 @@ case "$backbone_choice" in
 esac
 
 echo "Select Dataset:"
-echo "  1) Market-1501      (./data/Market)      -> prepare.py (auto-download available)"
-echo "  2) DukeMTMC-reID    (./data/Duke)        -> prepare_Duke.py (auto-download available)"
-echo "  3) MSMT17           (./data/MSMT17)      -> prepare_MSMT.py"
-echo "  4) CUB-200-2011     (./data/CUB)         -> prepare_CUB.py"
-echo "  5) VehicleID        (./data/VehicleID)   -> prepare_VehicleID.py"
-echo "  6) VeRi             (./data/VeRi)        -> prepare_VeRi.py"
-echo "  7) VIPeR            (./data/VIPeR)       -> prepare_viper.py"
+echo "  1) Market-1501 (auto-download available)"
+echo "  2) DukeMTMC-reID (auto-download available)"
+echo "  3) MSMT17"
+echo "  4) CUB-200-2011"
+echo "  5) VehicleID"
+echo "  6) VeRi"
+echo "  7) VIPeR"
 read -r -p "Enter dataset number [1]: " dataset_choice
 dataset_choice="${dataset_choice:-1}"
 
