@@ -27,7 +27,7 @@ from circle_loss import CircleLoss, convert_label_to_similarity
 from instance_loss import InstanceLoss
 from ODFA import ODFA
 from utils import save_network
-from tool.lark import lark_notify
+from tool.lark import lark_notify, lark_log, generate_run_id
 version =  torch.__version__
 from pytorch_metric_learning import losses, miners #pip install pytorch-metric-learning
 
@@ -84,6 +84,7 @@ parser.add_argument('--adv', default=0.0, type=float, help='add the adversarial 
 parser.add_argument('--aiter', default=10, type=float, help='enable adversarial loss every x iter' )
 
 opt = parser.parse_args()
+run_id = generate_run_id()
 
 if opt.DG:
     opt.wa = True #DG will enable swa.
@@ -283,6 +284,29 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
             f"epochs={num_epochs}, batchsize={opt.batchsize}, base_lr={opt.lr}, weight_decay={opt.weight_decay}\n"
             f"gpu_ids={opt.gpu_ids}, fp16={opt.fp16}, bf16={opt.bf16}, cosine={opt.cosine}, wa={opt.wa}"
         ),
+    )
+    lark_log(
+        project="Person_reID",
+        file="train.py",
+        run_id=run_id,
+        log={
+            "event": "train_start",
+            "run_name": name,
+            "backbone": backbone,
+            "data_dir": data_dir,
+            "nclasses": opt.nclasses,
+            "train_samples": dataset_sizes["train"],
+            "val_samples": dataset_sizes["val"],
+            "epochs": num_epochs,
+            "batchsize": opt.batchsize,
+            "base_lr": opt.lr,
+            "weight_decay": opt.weight_decay,
+            "gpu_ids": opt.gpu_ids,
+            "fp16": opt.fp16,
+            "bf16": opt.bf16,
+            "cosine": opt.cosine,
+            "wa": opt.wa,
+        },
     )
 
     for epoch in range(num_epochs):
@@ -505,10 +529,27 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
         print('Training complete in {:.0f}m {:.0f}s'.format(
             time_elapsed // 60, time_elapsed % 60))
         print()
-        if (epoch + 1) % 20 == 0:
-            current_lr = optimizer.param_groups[0]['lr']
-            train_stat = epoch_stats.get('train', {})
-            val_stat = epoch_stats.get('val', {})
+        current_lr = optimizer.param_groups[0]['lr']
+        train_stat = epoch_stats.get('train', {})
+        val_stat = epoch_stats.get('val', {})
+        lark_log(
+            project="Person_reID",
+            file="train.py",
+            run_id=run_id,
+            log={
+                "event": "train_update",
+                "epoch": epoch + 1,
+                "total_epochs": num_epochs,
+                "elapsed_seconds": int(time_elapsed),
+                "lr": float(current_lr),
+                "train_loss": float(train_stat.get("loss", 0.0)),
+                "train_acc": float(train_stat.get("acc", 0.0)),
+                "val_loss": float(val_stat.get("loss", 0.0)),
+                "val_acc": float(val_stat.get("acc", 0.0)),
+                "best_val_acc": float(best_val_acc),
+            },
+        )
+        if (epoch + 1) % 30 == 0:
             lark_notify(
                 title=f"[Train Update] {name} Epoch {epoch + 1}/{num_epochs}",
                 msg=(
@@ -546,6 +587,22 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
             f"final_train_loss={y_loss['train'][-1]:.4f}, final_train_acc={1.0-y_err['train'][-1]:.4f}\n"
             f"final_val_loss={y_loss['val'][-1]:.4f}, final_val_acc={1.0-y_err['val'][-1]:.4f}"
         ),
+    )
+    lark_log(
+        project="Person_reID",
+        file="train.py",
+        run_id=run_id,
+        log={
+            "event": "train_end",
+            "run_name": name,
+            "total_seconds": int(time_elapsed),
+            "epochs": num_epochs,
+            "best_val_acc": float(best_val_acc),
+            "final_train_loss": float(y_loss["train"][-1]),
+            "final_train_acc": float(1.0 - y_err["train"][-1]),
+            "final_val_loss": float(y_loss["val"][-1]),
+            "final_val_acc": float(1.0 - y_err["val"][-1]),
+        },
     )
 
     return model
