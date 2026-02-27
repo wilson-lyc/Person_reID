@@ -39,6 +39,26 @@ Share to
     </a>
         
 
+## One-Click Run
+We provide interactive scripts in this repo to run dependency install + dataset preparation + train + test.
+
+First clone this repository manually:
+```bash
+git clone https://github.com/wilson-lyc/Person_reID
+cd Person_reID
+```
+
+Then run one-click script:
+```bash
+chmod +x run.sh
+bash run.sh
+```
+
+Dataset behavior in one-click script:
+- If prepared dataset already exists (`train/query/gallery`), it reuses it.
+- For Market-1501 and DukeMTMC-reID, it tries Google Drive download automatically.
+- If Google download fails (network restriction), script stops and prints a manual dataset preparation guide, including `prepare.py --dataset ... --download_path ...` commands.
+
 ## Tutorial
 * [8 min Tutorial](https://github.com/layumi/Person_reID_baseline_pytorch/blob/master/tutorial/README.md)，[8分钟教程](https://zhuanlan.zhihu.com/p/50387521)
 * [中文视频简介](https://www.bilibili.com/video/BV11K4y1f7eQ)
@@ -51,7 +71,6 @@ Share to
 * [Prerequisites](#prerequisites)
 * [Getting Started](#getting-started)
     * [Installation](#installation)
-    * [One-Click Run](#one-click-run)
     * [Dataset Preparation](#dataset--preparation)
     * [Train](#train)
     * [Test](#test)
@@ -337,26 +356,6 @@ python setup.py install --cuda_ext --cpp_ext
 Because pytorch and torchvision are ongoing projects.
 
 Here we noted that our code is tested based on Pytorch 0.3.0/0.4.0/0.5.0/1.0.0 and Torchvision 0.2.0/0.2.1 .
-
-### One-Click Run
-We provide interactive scripts in this repo to run dependency install + dataset preparation + train + test.
-
-First clone this repository manually:
-```bash
-git clone https://github.com/wilson-lyc/Person_reID
-cd Person_reID
-```
-
-Then run one-click script:
-```bash
-chmod +x run.sh
-bash run.sh
-```
-
-Dataset behavior in one-click script:
-- If prepared dataset already exists (`train/query/gallery`), it reuses it.
-- For Market-1501 and DukeMTMC-reID, it tries Google Drive download automatically.
-- If Google download fails (network restriction), script stops and prints a manual dataset preparation guide, including `prepare.py --dataset ... --download_path ...` commands.
 
 ### Dataset & Preparation
 
