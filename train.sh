@@ -9,6 +9,9 @@ cd "$SCRIPT_DIR"
 # Co-developed with Codex (OpenAI)
 # Project codebase: https://github.com/layumi/Person_reID_baseline_pytorch
 
+# =========================
+# UI / display helpers
+# =========================
 print_banner() {
 cat <<'EOF'
 ██████╗ ███████╗██████╗ ███████╗ ██████╗ ███╗   ██╗    ██████╗ ███████╗██╗██████╗
@@ -20,136 +23,123 @@ cat <<'EOF'
 EOF
 }
 
+print_project_info() {
+  echo "Script by Wilson: https://github.com/wilson-lyc"
+  echo "Project codebase: https://github.com/layumi/Person_reID_baseline_pytorch"
+  echo
+}
+
+select_option_by_number() {
+  local __outvar="$1"
+  local title="$2"
+  local default_choice="$3"
+  shift 3
+  local options=("$@")
+  local choice=""
+  local selected_idx=0
+  local selected_text=""
+  local input_prompt="Enter choice [${default_choice}]: "
+
+  echo "$title"
+  for i in "${!options[@]}"; do
+    printf "  %d) %s\n" "$((i + 1))" "${options[$i]}"
+  done
+
+  while true; do
+    read -r -p "${input_prompt}" choice
+    choice="${choice:-$default_choice}"
+    if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#options[@]} )); then
+      selected_idx=$((choice - 1))
+      selected_text="${options[$selected_idx]}"
+      break
+    fi
+    if [[ -t 1 ]]; then
+      printf "\033[1A\r\033[2K"
+    fi
+    input_prompt="Invalid choice (${choice}). Enter choice [${default_choice}]: "
+  done
+
+  if [[ -t 1 ]]; then
+    printf "\033[%dA" "$(( ${#options[@]} + 2 ))"
+    printf "\033[J"
+  fi
+  echo "${title} ${selected_text}"
+  printf -v "$__outvar" '%s' "$choice"
+}
+
+# Prompt helper: only accept `Y` or `n` (empty input defaults to `Y`).
+ask_yes_no_default_yes() {
+  local prompt="$1"
+  local answer
+  while true; do
+    read -r -p "${prompt} [Y/n]: " answer
+    answer="${answer:-Y}"
+    case "$answer" in
+      Y|n)
+        printf '%s\n' "$answer"
+        return 0
+        ;;
+      *)
+        echo "Invalid input. Please enter exactly 'Y' or 'n'."
+        ;;
+    esac
+  done
+}
+
+# =========================
+# Dataset preparation
+# =========================
 print_manual_dataset_tutorial() {
   local ds_name="$1"
   local raw_dir="$2"
   local prepared_dir="$3"
-  local prepare_script="$4"
 
   echo
   echo "================ MANUAL DATASET PREPARATION GUIDE ================"
   echo "[Dataset] ${ds_name}"
   echo "Raw path should be: ${raw_dir}"
-  echo "Run prepare command:"
-  echo "  python ${prepare_script} --path \"${raw_dir}\""
+  echo "Please prepare the raw dataset folders/files under the path above."
   echo "Expected prepared path:"
   echo "  ${prepared_dir}"
-  echo "If training/test still fails, please check folder structure under:"
-  echo "  ${prepared_dir}"
+  echo "After raw data is ready, rerun train.sh."
   echo "=================================================================="
   echo
 }
 
 dataset_has_required_structure() {
-  local path="$1"
-  [[ -d "${path}/query" && -d "${path}/bounding_box_train" && -d "${path}/bounding_box_test" ]]
-}
-
-try_auto_download_dataset() {
   local ds_name="$1"
-  local raw_dir="$2"
-  local file_id=""
-  local archive_name=""
+  local path="$2"
 
   case "$ds_name" in
-    market)
-      file_id="0B8-rUzbwVRk0c054eEozWG9COHM"
-      archive_name="Market-1501-v15.09.15.zip"
+    market|duke)
+      [[ -d "${path}/query" && -d "${path}/bounding_box_train" && -d "${path}/bounding_box_test" ]]
       ;;
-    duke)
-      file_id="1jjE85dRCMOgRtvJ5RQV9-Afs-2_5dY3O"
-      archive_name="DukeMTMC-reID.zip"
+    msmt17)
+      [[ -d "${path}/train" && -d "${path}/test" \
+         && -f "${path}/list_train.txt" && -f "${path}/list_val.txt" \
+         && -f "${path}/list_query.txt" && -f "${path}/list_gallery.txt" ]]
+      ;;
+    cub)
+      [[ -d "${path}/images" ]]
+      ;;
+    vehicleid)
+      [[ -d "${path}/image" \
+         && -f "${path}/attribute/img2vid.txt" \
+         && -f "${path}/train_test_split/train_list.txt" \
+         && -f "${path}/train_test_split/test_list_800.txt" \
+         && -f "${path}/train_test_split/test_list_1600.txt" \
+         && -f "${path}/train_test_split/test_list_2400.txt" ]]
+      ;;
+    veri)
+      [[ -d "${path}/image_train" && -d "${path}/image_test" && -d "${path}/image_query" ]]
+      ;;
+    viper)
+      [[ -d "${path}/cam_a" && -d "${path}/cam_b" ]]
       ;;
     *)
       return 1
       ;;
   esac
-
-  local parent_dir
-  parent_dir="$(dirname "$raw_dir")"
-  local archive_path="${parent_dir}/${archive_name}"
-  local tmp_extract_dir="${parent_dir}/.tmp_extract_${ds_name}"
-
-  echo "Dataset missing. Trying Google Drive auto-download for ${ds_name} ..."
-  mkdir -p "$parent_dir"
-
-  echo "Installing gdown (if needed) ..."
-  if ! python -m pip install gdown; then
-    echo "Auto-download failed: unable to install gdown."
-    return 2
-  fi
-
-  echo "Downloading archive to ${archive_path} ..."
-  if ! python -m gdown --id "$file_id" --output "$archive_path"; then
-    echo "Auto-download failed: cannot access Google Drive or download was blocked."
-    return 2
-  fi
-
-  echo "Extracting and normalizing dataset layout ..."
-  if ! python - "$raw_dir" "$archive_path" "$tmp_extract_dir" <<'PY'
-import shutil
-import sys
-import tarfile
-import zipfile
-from pathlib import Path
-
-raw_dir = Path(sys.argv[1]).resolve()
-archive_path = Path(sys.argv[2]).resolve()
-tmp_extract_dir = Path(sys.argv[3]).resolve()
-
-required = {"query", "bounding_box_train", "bounding_box_test"}
-
-if tmp_extract_dir.exists():
-    shutil.rmtree(tmp_extract_dir)
-tmp_extract_dir.mkdir(parents=True, exist_ok=True)
-
-if archive_path.suffix.lower() == ".zip":
-    with zipfile.ZipFile(archive_path, "r") as zf:
-        zf.extractall(tmp_extract_dir)
-elif archive_path.suffix.lower() in {".tar", ".gz", ".tgz", ".bz2", ".xz"}:
-    with tarfile.open(archive_path, "r:*") as tf:
-        tf.extractall(tmp_extract_dir)
-else:
-    raise RuntimeError(f"Unsupported archive format: {archive_path}")
-
-def is_raw_root(path: Path) -> bool:
-    if not path.is_dir():
-        return False
-    names = {p.name for p in path.iterdir() if p.is_dir()}
-    return required.issubset(names)
-
-candidate = None
-if is_raw_root(tmp_extract_dir):
-    candidate = tmp_extract_dir
-else:
-    for p in tmp_extract_dir.rglob("*"):
-        if is_raw_root(p):
-            candidate = p
-            break
-
-if candidate is None:
-    raise RuntimeError(
-        f"Failed to locate dataset root after extracting {archive_path}. "
-        f"Expected folders: {sorted(required)}"
-    )
-
-raw_dir.mkdir(parents=True, exist_ok=True)
-for item in candidate.iterdir():
-    dst = raw_dir / item.name
-    if dst.exists():
-        if dst.is_dir():
-            shutil.rmtree(dst)
-        else:
-            dst.unlink()
-    shutil.move(str(item), str(dst))
-
-shutil.rmtree(tmp_extract_dir, ignore_errors=True)
-print(f"Dataset prepared at: {raw_dir}")
-PY
-  then
-    echo "Auto-download failed: archive extraction/normalization error."
-    return 2
-  fi
 }
 
 ensure_dataset_ready() {
@@ -158,87 +148,59 @@ ensure_dataset_ready() {
   local prepared_dir="$3"
   local prepare_script="$4"
 
-  if ! dataset_has_required_structure "$raw_dir"; then
-    if [[ "$ds_name" == "market" || "$ds_name" == "duke" ]]; then
-      echo "Dataset path is missing or incomplete: ${raw_dir}"
-      read -r -p "Do you want to auto-download ${ds_name} from Google Drive? [Y/n]: " auto_download_confirm
-      auto_download_confirm="${auto_download_confirm:-Y}"
-      case "$auto_download_confirm" in
-        Y|y|yes|YES)
-          if ! try_auto_download_dataset "$ds_name" "$raw_dir"; then
-            echo "Google Drive auto-download is unavailable for ${ds_name}."
-            echo "Please prepare dataset manually first, then rerun train.sh."
-            print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir" "$prepare_script"
-            exit 1
-          fi
-          ;;
-        *)
-          echo "Auto-download canceled by user."
-          echo "Please prepare dataset manually first, then rerun train.sh."
-          print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir" "$prepare_script"
-          exit 1
-          ;;
-      esac
-    else
-      echo "Dataset raw path not found or incomplete: ${raw_dir}"
-      print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir" "$prepare_script"
-      return 1
-    fi
-  fi
-
-  if ! dataset_has_required_structure "$raw_dir"; then
-    echo "Dataset raw path is still incomplete after auto-download: ${raw_dir}"
-    print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir" "$prepare_script"
+  if [[ ! -f "$prepare_script" ]]; then
+    echo "Prepare script not found: ${prepare_script}"
+    echo "Please check your project files, then rerun train.sh."
     return 1
   fi
 
-  echo "Preparing dataset by ${prepare_script} ..."
+  if ! dataset_has_required_structure "$ds_name" "$raw_dir"; then
+    echo "Dataset raw path not found or incomplete: ${raw_dir}"
+    echo "Please prepare this dataset manually according to its required raw folder/files."
+    print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir"
+    echo "After preparing the dataset, rerun train.sh."
+    return 1
+  fi
+
+  echo "Preparing dataset..."
   if ! python "$prepare_script" --path "$raw_dir"; then
     echo "Prepare failed."
-    print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir" "$prepare_script"
+    print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir"
     return 1
   fi
 
   if [[ ! -d "$prepared_dir" ]]; then
     echo "Prepared path not found after prepare: ${prepared_dir}"
-    print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir" "$prepare_script"
+    print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir"
     return 1
   fi
 
   return 0
 }
 
+# =========================
+# Network / model source config
+# =========================
 configure_hf_endpoint_for_hrnet() {
   local selected_backbone="$1"
+  local use_hf_mirror
   if [[ "$selected_backbone" != "hrnet" ]]; then
     return 0
   fi
 
-  if [[ -n "${HF_ENDPOINT:-}" ]]; then
-    echo "HRNet selected. HF_ENDPOINT is already set to: ${HF_ENDPOINT}"
-    return 0
-  fi
-
-  echo "HRNet selected. Checking direct access to Hugging Face..."
-  if python - <<'PY'
-import sys
-import urllib.request
-
-url = "https://huggingface.co"
-try:
-    with urllib.request.urlopen(url, timeout=5) as resp:
-        status = getattr(resp, "status", 200)
-    # Any non-error HTTP response means endpoint is reachable.
-    sys.exit(0 if 200 <= status < 500 else 1)
-except Exception:
-    sys.exit(1)
-PY
-  then
-    echo "Hugging Face is reachable. Using direct endpoint."
-  else
-    export HF_ENDPOINT="https://hf-mirror.com"
-    echo "Hugging Face is unreachable. Fallback to mirror: ${HF_ENDPOINT}"
-  fi
+  use_hf_mirror="$(ask_yes_no_default_yes "HRNet may download weights from Hugging Face. Use mirror (https://hf-mirror.com)?")"
+  case "$use_hf_mirror" in
+    Y)
+      export HF_ENDPOINT="https://hf-mirror.com"
+      echo "Using mirror endpoint: ${HF_ENDPOINT}"
+      ;;
+    n)
+      if [[ -n "${HF_ENDPOINT:-}" ]]; then
+        unset HF_ENDPOINT
+      fi
+      echo "Using direct Hugging Face endpoint."
+      ;;
+  esac
 }
 
 ensure_ibn_checkpoint() {
@@ -253,9 +215,9 @@ ensure_ibn_checkpoint() {
   local direct_url="https://github.com/XingangPan/IBN-Net/releases/download/v1.0/resnet50_ibn_a-d9d0bb7b.pth"
   local mirror_url="https://ghfast.top/?q=https://github.com/XingangPan/IBN-Net/releases/download/v1.0/resnet50_ibn_a-d9d0bb7b.pth"
   local tmp_path="${checkpoint_path}.tmp"
-  local use_mirror_confirm=""
-  local download_url=""
-  local download_source=""
+  local use_mirror_confirm
+  local download_url
+  local download_source
 
   if [[ -s "$checkpoint_path" ]]; then
     echo "IBN checkpoint already exists: ${checkpoint_path}"
@@ -271,14 +233,13 @@ ensure_ibn_checkpoint() {
     return 1
   fi
 
-  read -r -p "Use mirror URL for IBN checkpoint download? [Y/n]: " use_mirror_confirm
-  use_mirror_confirm="${use_mirror_confirm:-Y}"
+  use_mirror_confirm="$(ask_yes_no_default_yes "Use mirror URL for IBN checkpoint download?")"
   case "$use_mirror_confirm" in
-    Y|y|yes|YES)
+    Y)
       download_url="$mirror_url"
       download_source="mirror"
       ;;
-    *)
+    n)
       download_url="$direct_url"
       download_source="direct"
       ;;
@@ -295,63 +256,51 @@ ensure_ibn_checkpoint() {
     fi
   elif command -v wget >/dev/null 2>&1; then
     # Fallback with wget progress display.
-    if wget --show-progress -O "$tmp_path" "$download_url"; then
+    if wget -O "$tmp_path" "$download_url"; then
       mv "$tmp_path" "$checkpoint_path"
       echo "IBN checkpoint downloaded from ${download_source} URL."
       return 0
     fi
-  elif python - "$download_url" "$tmp_path" <<'PY'
-import shutil
-import sys
-import urllib.request
-
-url = sys.argv[1]
-output = sys.argv[2]
-request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-with urllib.request.urlopen(request, timeout=120) as resp, open(output, "wb") as f:
-    shutil.copyfileobj(resp, f)
-PY
-  then
-    echo "Downloaded by Python fallback (no progress bar shown)."
-    mv "$tmp_path" "$checkpoint_path"
-    echo "IBN checkpoint downloaded from ${download_source} URL."
-    return 0
   else
-    echo "No curl/wget available, and Python fallback download failed."
+    echo "No curl/wget available. Skip auto-download."
   fi
 
   rm -f "$tmp_path"
-  echo "Failed to download IBN checkpoint from ${download_source} URL."
-  echo "Please manually download and place file at:"
+  echo "Failed to download IBN checkpoint automatically."
+  echo "Please download it manually and place file at:"
   echo "  ${checkpoint_path}"
-  echo "Direct URL:"
-  echo "  ${direct_url}"
-  echo "Mirror URL:"
-  echo "  ${mirror_url}"
+  echo "Preferred URL (${download_source}):"
+  echo "  ${download_url}"
+  echo "Alternative URL:"
+  if [[ "$download_source" == "mirror" ]]; then
+    echo "  ${direct_url}"
+  else
+    echo "  ${mirror_url}"
+  fi
   return 1
 }
 
+# =========================
+# Interactive configuration
+# =========================
 clear
 print_banner
-echo "Script by Wilson: https://github.com/wilson-lyc"
-echo "Project codebase: https://github.com/layumi/Person_reID_baseline_pytorch"
-echo
+print_project_info
 
-echo "Select Backbone:"
-echo "  1) ResNet50 (baseline)"
-echo "  2) ResNet50-IBN"
-echo "  3) DenseNet"
-echo "  4) Swin"
-echo "  5) SwinV2"
-echo "  6) DINOv3"
-echo "  7) EfficientNet-B4"
-echo "  8) NAS"
-echo "  9) HRNet"
-echo "  10) ConvNeXt"
-echo "  11) PCB (ResNet50+PCB)"
-echo "  12) ResNet50-USAM"
-read -r -p "Enter backbone number [1]: " backbone_choice
-backbone_choice="${backbone_choice:-1}"
+# Backbone selection
+select_option_by_number backbone_choice "Select Backbone:" "1" \
+  "ResNet50 (baseline, default)" \
+  "ResNet50-IBN" \
+  "DenseNet" \
+  "Swin" \
+  "SwinV2" \
+  "DINOv3" \
+  "EfficientNet-B4" \
+  "NAS" \
+  "HRNet" \
+  "ConvNeXt" \
+  "PCB (ResNet50+PCB)" \
+  "ResNet50-USAM"
 
 case "$backbone_choice" in
   1) backbone="resnet50"; backbone_flags=() ;;
@@ -372,55 +321,44 @@ case "$backbone_choice" in
     ;;
 esac
 
-echo "Select Dataset:"
-echo "  1) Market-1501 (auto-download available)"
-echo "  2) DukeMTMC-reID (auto-download available)"
-echo "  3) MSMT17"
-echo "  4) CUB-200-2011"
-echo "  5) VehicleID"
-echo "  6) VeRi"
-echo "  7) VIPeR"
-read -r -p "Enter dataset number [1]: " dataset_choice
-dataset_choice="${dataset_choice:-1}"
+# Dataset selection and corresponding prepare script
+select_option_by_number dataset_choice "Select Dataset:" "1" \
+  "Market-1501 (default)" \
+  "DukeMTMC-reID" \
+  "MSMT17" \
+  "CUB-200-2011" \
+  "VehicleID" \
+  "VeRi" \
+  "VIPeR"
 
-resolve_dataset_config() {
-  local choice="$1"
-  case "$choice" in
-    1) selected_dataset="market";    selected_raw_data_dir="./data/Market";    selected_prepare_script="prepare.py" ;;
-    2) selected_dataset="duke";      selected_raw_data_dir="./data/Duke";      selected_prepare_script="prepare_Duke.py" ;;
-    3) selected_dataset="msmt17";    selected_raw_data_dir="./data/MSMT17";    selected_prepare_script="prepare_MSMT.py" ;;
-    4) selected_dataset="cub";       selected_raw_data_dir="./data/CUB";       selected_prepare_script="prepare_CUB.py" ;;
-    5) selected_dataset="vehicleid"; selected_raw_data_dir="./data/VehicleID"; selected_prepare_script="prepare_VehicleID.py" ;;
-    6) selected_dataset="veri";      selected_raw_data_dir="./data/VeRi";      selected_prepare_script="prepare_VeRi.py" ;;
-    7) selected_dataset="viper";     selected_raw_data_dir="./data/VIPeR";     selected_prepare_script="prepare_viper.py" ;;
-    *)
-      echo "Invalid dataset number: $choice"
-      exit 1
-      ;;
-  esac
-}
-
-resolve_dataset_config "$dataset_choice"
-dataset="$selected_dataset"
-raw_data_dir="$selected_raw_data_dir"
-prepare_script="$selected_prepare_script"
+case "$dataset_choice" in
+  1) dataset="market";    raw_data_dir="./data/Market";    prepare_script="prepare.py" ;;
+  2) dataset="duke";      raw_data_dir="./data/Duke";      prepare_script="prepare_Duke.py" ;;
+  3) dataset="msmt17";    raw_data_dir="./data/MSMT17";    prepare_script="prepare_MSMT.py" ;;
+  4) dataset="cub";       raw_data_dir="./data/CUB";       prepare_script="prepare_CUB.py" ;;
+  5) dataset="vehicleid"; raw_data_dir="./data/VehicleID"; prepare_script="prepare_VehicleID.py" ;;
+  6) dataset="veri";      raw_data_dir="./data/VeRi";      prepare_script="prepare_VeRi.py" ;;
+  7) dataset="viper";     raw_data_dir="./data/VIPeR";     prepare_script="prepare_viper.py" ;;
+  *)
+    echo "Invalid dataset number: $dataset_choice"
+    exit 1
+    ;;
+esac
 
 data_dir="${raw_data_dir}/pytorch"
-test_dir="$data_dir"
 
-echo "Select Loss:"
-echo "  1) CrossEntropy (baseline)"
-echo "  2) Circle Loss (+CE, warm_epoch=5)"
-echo "  3) Triplet Loss (+CE)"
-echo "  4) ArcFace Loss (+CE)"
-echo "  5) CosFace Loss (+CE)"
-echo "  6) Contrast Loss (+CE)"
-echo "  7) Instance Loss (+CE)"
-echo "  8) Instance-ID Loss (+CE)"
-echo "  9) Lifted Loss (+CE)"
-echo "  10) Sphere Loss (+CE)"
-read -r -p "Enter loss number [1]: " loss_choice
-loss_choice="${loss_choice:-1}"
+# Loss selection
+select_option_by_number loss_choice "Select Loss:" "1" \
+  "CrossEntropy (default)" \
+  "Circle" \
+  "Triplet" \
+  "ArcFace" \
+  "CosFace" \
+  "Contrast" \
+  "Instance" \
+  "Instance-ID" \
+  "Lifted" \
+  "Sphere"
 
 case "$loss_choice" in
   1) loss_name="ce"; loss_flags=() ;;
@@ -451,11 +389,12 @@ default_run_name="${backbone}_${dataset}_${loss_name}_${run_id}"
 read -r -p "Run name [${default_run_name}]: " run_name
 run_name="${run_name:-$default_run_name}"
 
+# =========================
+# Run confirmation
+# =========================
 clear
 print_banner
-echo "Script by Wilson: https://github.com/wilson-lyc"
-echo "Project codebase: https://github.com/layumi/Person_reID_baseline_pytorch"
-echo
+print_project_info
 
 echo "----------------------------------------"
 echo "backbone      : $backbone"
@@ -463,38 +402,41 @@ echo "dataset       : $dataset"
 echo "prepare_script: $prepare_script"
 echo "raw_data_dir  : $raw_data_dir"
 echo "data_dir      : $data_dir"
-echo "test_dir      : $test_dir"
 echo "loss          : $loss_name"
 echo "run_name      : $run_name"
 echo "run_id        : $run_id"
 echo "gpu_ids       : $gpu_ids"
 echo "which_epoch   : $which_epoch"
 echo "----------------------------------------"
-read -r -p "Confirm and start train+evaluate workflow? [Y/n]: " confirm_run
-confirm_run="${confirm_run:-Y}"
+confirm_run="$(ask_yes_no_default_yes "Confirm and start train+evaluate workflow?")"
 case "$confirm_run" in
-  Y|y|yes|YES)
+  Y)
     ;;
-  *)
+  n)
     echo "Canceled."
     exit 0
     ;;
 esac
 
+# =========================
+# Runtime setup and execution
+# =========================
+# Configure network mirror for HRNet download and ensure IBN checkpoint.
 configure_hf_endpoint_for_hrnet "$backbone"
 ensure_ibn_checkpoint "$backbone"
 
+# Build train/test commands from selected options.
 train_cmd=(python train.py --gpu_ids "$gpu_ids" --name "$run_name" --data_dir "$data_dir" --run_id "$run_id")
 train_cmd+=(--train_all)
 train_cmd+=("${backbone_flags[@]}")
 train_cmd+=("${loss_flags[@]}")
 
-test_cmd=(python test.py --gpu_ids "$gpu_ids" --name "$run_name" --test_dir "$test_dir" --which_epoch "$which_epoch" --run_id "$run_id")
+test_cmd=(python test.py --gpu_ids "$gpu_ids" --name "$run_name" --test_dir "$data_dir" --which_epoch "$which_epoch" --run_id "$run_id")
 
 echo "[1/4] Installing dependencies from requirements.txt..."
 python -m pip install -r requirements.txt
 
-
+# Validate raw dataset then run dataset-specific prepare*.py.
 echo "[2/4] Preparing dataset..."
 ensure_dataset_ready "$dataset" "$raw_data_dir" "$data_dir" "$prepare_script"
 

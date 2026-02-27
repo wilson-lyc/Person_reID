@@ -20,6 +20,44 @@ cat <<'EOF'
 EOF
 }
 
+select_option_by_number() {
+  local __outvar="$1"
+  local title="$2"
+  local default_choice="$3"
+  shift 3
+  local options=("$@")
+  local choice=""
+  local selected_idx=0
+  local selected_text=""
+  local input_prompt="Enter choice [${default_choice}]: "
+
+  echo "$title"
+  for i in "${!options[@]}"; do
+    printf "  %d) %s\n" "$((i + 1))" "${options[$i]}"
+  done
+
+  while true; do
+    read -r -p "${input_prompt}" choice
+    choice="${choice:-$default_choice}"
+    if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#options[@]} )); then
+      selected_idx=$((choice - 1))
+      selected_text="${options[$selected_idx]}"
+      break
+    fi
+    if [[ -t 1 ]]; then
+      printf "\033[1A\r\033[2K"
+    fi
+    input_prompt="Invalid choice (${choice}). Enter choice [${default_choice}]: "
+  done
+
+  if [[ -t 1 ]]; then
+    printf "\033[%dA" "$(( ${#options[@]} + 2 ))"
+    printf "\033[J"
+  fi
+  echo "${title} ${selected_text}"
+  printf -v "$__outvar" '%s' "$choice"
+}
+
 print_manual_dataset_tutorial() {
   local ds_name="$1"
   local raw_dir="$2"
@@ -286,16 +324,7 @@ else
 fi
 
 if [[ "${#available_runs[@]}" -gt 0 ]]; then
-  echo "Select model to evaluate:"
-  for i in "${!available_runs[@]}"; do
-    printf "  %d) %s\n" "$((i + 1))" "${available_runs[$i]}"
-  done
-  read -r -p "Enter model number [1]: " run_choice
-  run_choice="${run_choice:-1}"
-  if ! [[ "$run_choice" =~ ^[0-9]+$ ]] || (( run_choice < 1 || run_choice > ${#available_runs[@]} )); then
-    echo "Invalid model number: $run_choice"
-    exit 1
-  fi
+  select_option_by_number run_choice "Select model to evaluate:" "1" "${available_runs[@]}"
   run_name="${available_runs[$((run_choice - 1))]}"
 else
   echo "No trained model with opts.yaml found under ./model."
@@ -313,16 +342,14 @@ if [[ ! -f "$config_path" ]]; then
   exit 1
 fi
 
-echo "Select Test Dataset:"
-echo "  1) Market-1501 (auto-download available)"
-echo "  2) DukeMTMC-reID (auto-download available)"
-echo "  3) MSMT17"
-echo "  4) CUB-200-2011"
-echo "  5) VehicleID"
-echo "  6) VeRi"
-echo "  7) VIPeR"
-read -r -p "Enter test dataset number [1]: " test_dataset_choice
-test_dataset_choice="${test_dataset_choice:-1}"
+select_option_by_number test_dataset_choice "Select Test Dataset:" "1" \
+  "Market-1501 (auto-download available)" \
+  "DukeMTMC-reID (auto-download available)" \
+  "MSMT17" \
+  "CUB-200-2011" \
+  "VehicleID" \
+  "VeRi" \
+  "VIPeR"
 
 resolve_dataset_config "$test_dataset_choice"
 test_dataset="$selected_dataset"
