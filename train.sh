@@ -349,6 +349,8 @@ case "$loss_choice" in
 esac
 
 gpu_ids="0"
+read -r -p "GPU ids [0]: " input_gpu_ids
+gpu_ids="${input_gpu_ids:-$gpu_ids}"
 
 read -r -p "Which epoch for test [last]: " which_epoch
 which_epoch="${which_epoch:-last}"
