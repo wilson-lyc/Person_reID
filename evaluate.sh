@@ -20,6 +20,59 @@ cat <<'EOF'
 EOF
 }
 
+select_with_arrows() {
+  local __outvar="$1"
+  shift
+  local prompt="$1"
+  shift
+  local options=("$@")
+  local selected=0
+  local key=""
+
+  if [[ "${#options[@]}" -eq 0 ]]; then
+    echo "No options provided for prompt: ${prompt}"
+    return 1
+  fi
+
+  if [[ ! -t 0 || ! -t 1 ]]; then
+    echo "${prompt}"
+    echo "${options[0]}"
+    printf -v "$__outvar" '%d' 1
+    return 0
+  fi
+
+  echo "${prompt}"
+  while true; do
+    for i in "${!options[@]}"; do
+      if (( i == selected )); then
+        printf " > %s\n" "${options[$i]}"
+      else
+        printf "   %s\n" "${options[$i]}"
+      fi
+    done
+
+    IFS= read -rsn1 key
+    case "$key" in
+      $'\x1b')
+        IFS= read -rsn2 key
+        case "$key" in
+          '[A') ((selected = (selected - 1 + ${#options[@]}) % ${#options[@]})) ;;
+          '[B') ((selected = (selected + 1) % ${#options[@]})) ;;
+        esac
+        ;;
+      "")
+        printf "\033[%dA" "${#options[@]}"
+        printf "\033[J"
+        printf "%s\n" "${options[$selected]}"
+        printf -v "$__outvar" '%d' "$((selected + 1))"
+        return 0
+        ;;
+    esac
+
+    printf "\033[%dA" "${#options[@]}"
+  done
+}
+
 print_manual_dataset_tutorial() {
   local ds_name="$1"
   local raw_dir="$2"
@@ -286,16 +339,11 @@ else
 fi
 
 if [[ "${#available_runs[@]}" -gt 0 ]]; then
-  echo "Select model to evaluate:"
+  run_options=()
   for i in "${!available_runs[@]}"; do
-    printf "  %d) %s\n" "$((i + 1))" "${available_runs[$i]}"
+    run_options+=("$((i + 1))) ${available_runs[$i]}")
   done
-  read -r -p "Enter model number [1]: " run_choice
-  run_choice="${run_choice:-1}"
-  if ! [[ "$run_choice" =~ ^[0-9]+$ ]] || (( run_choice < 1 || run_choice > ${#available_runs[@]} )); then
-    echo "Invalid model number: $run_choice"
-    exit 1
-  fi
+  select_with_arrows run_choice "Select model to evaluate (use Up/Down and Enter):" "${run_options[@]}"
   run_name="${available_runs[$((run_choice - 1))]}"
 else
   echo "No trained model with opts.yaml found under ./model."
@@ -313,16 +361,16 @@ if [[ ! -f "$config_path" ]]; then
   exit 1
 fi
 
-echo "Select Test Dataset:"
-echo "  1) Market-1501 (auto-download available)"
-echo "  2) DukeMTMC-reID (auto-download available)"
-echo "  3) MSMT17"
-echo "  4) CUB-200-2011"
-echo "  5) VehicleID"
-echo "  6) VeRi"
-echo "  7) VIPeR"
-read -r -p "Enter test dataset number [1]: " test_dataset_choice
-test_dataset_choice="${test_dataset_choice:-1}"
+test_dataset_options=(
+  "1) Market-1501 (auto-download available)"
+  "2) DukeMTMC-reID (auto-download available)"
+  "3) MSMT17"
+  "4) CUB-200-2011"
+  "5) VehicleID"
+  "6) VeRi"
+  "7) VIPeR"
+)
+select_with_arrows test_dataset_choice "Select Test Dataset (use Up/Down and Enter):" "${test_dataset_options[@]}"
 
 resolve_dataset_config "$test_dataset_choice"
 test_dataset="$selected_dataset"

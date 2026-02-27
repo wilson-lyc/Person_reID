@@ -29,6 +29,60 @@ print_project_info() {
   echo
 }
 
+# Interactive menu helper: move with Up/Down keys, confirm with Enter.
+select_with_arrows() {
+  local __outvar="$1"
+  shift
+  local prompt="$1"
+  shift
+  local options=("$@")
+  local selected=0
+  local key=""
+
+  if [[ "${#options[@]}" -eq 0 ]]; then
+    echo "No options provided for prompt: ${prompt}"
+    return 1
+  fi
+
+  if [[ ! -t 0 || ! -t 1 ]]; then
+    echo "${prompt}"
+    echo "${options[0]}"
+    printf -v "$__outvar" '%d' 1
+    return 0
+  fi
+
+  echo "${prompt}"
+  while true; do
+    for i in "${!options[@]}"; do
+      if (( i == selected )); then
+        printf " > %s\n" "${options[$i]}"
+      else
+        printf "   %s\n" "${options[$i]}"
+      fi
+    done
+
+    IFS= read -rsn1 key
+    case "$key" in
+      $'\x1b')
+        IFS= read -rsn2 key
+        case "$key" in
+          '[A') ((selected = (selected - 1 + ${#options[@]}) % ${#options[@]})) ;;
+          '[B') ((selected = (selected + 1) % ${#options[@]})) ;;
+        esac
+        ;;
+      "")
+        printf "\033[%dA" "${#options[@]}"
+        printf "\033[J"
+        printf "%s\n" "${options[$selected]}"
+        printf -v "$__outvar" '%d' "$((selected + 1))"
+        return 0
+        ;;
+    esac
+
+    printf "\033[%dA" "${#options[@]}"
+  done
+}
+
 # Prompt helper: only accept `Y` or `n` (empty input defaults to `Y`).
 ask_yes_no_default_yes() {
   local prompt="$1"
@@ -250,21 +304,21 @@ print_banner
 print_project_info
 
 # Backbone selection
-echo "Select Backbone:"
-echo "  1) ResNet50 (baseline, default)"
-echo "  2) ResNet50-IBN"
-echo "  3) DenseNet"
-echo "  4) Swin"
-echo "  5) SwinV2"
-echo "  6) DINOv3"
-echo "  7) EfficientNet-B4"
-echo "  8) NAS"
-echo "  9) HRNet"
-echo "  10) ConvNeXt"
-echo "  11) PCB (ResNet50+PCB)"
-echo "  12) ResNet50-USAM"
-read -r -p "Enter backbone number [1]: " backbone_choice
-backbone_choice="${backbone_choice:-1}"
+backbone_options=(
+  "1) ResNet50 (baseline, default)"
+  "2) ResNet50-IBN"
+  "3) DenseNet"
+  "4) Swin"
+  "5) SwinV2"
+  "6) DINOv3"
+  "7) EfficientNet-B4"
+  "8) NAS"
+  "9) HRNet"
+  "10) ConvNeXt"
+  "11) PCB (ResNet50+PCB)"
+  "12) ResNet50-USAM"
+)
+select_with_arrows backbone_choice "Select Backbone (use Up/Down and Enter):" "${backbone_options[@]}"
 
 case "$backbone_choice" in
   1) backbone="resnet50"; backbone_flags=() ;;
@@ -286,16 +340,16 @@ case "$backbone_choice" in
 esac
 
 # Dataset selection and corresponding prepare script
-echo "Select Dataset:"
-echo "  1) Market-1501 (default)"
-echo "  2) DukeMTMC-reID"
-echo "  3) MSMT17"
-echo "  4) CUB-200-2011"
-echo "  5) VehicleID"
-echo "  6) VeRi"
-echo "  7) VIPeR"
-read -r -p "Enter dataset number [1]: " dataset_choice
-dataset_choice="${dataset_choice:-1}"
+dataset_options=(
+  "1) Market-1501 (default)"
+  "2) DukeMTMC-reID"
+  "3) MSMT17"
+  "4) CUB-200-2011"
+  "5) VehicleID"
+  "6) VeRi"
+  "7) VIPeR"
+)
+select_with_arrows dataset_choice "Select Dataset (use Up/Down and Enter):" "${dataset_options[@]}"
 
 case "$dataset_choice" in
   1) dataset="market";    raw_data_dir="./data/Market";    prepare_script="prepare.py" ;;
@@ -314,19 +368,19 @@ esac
 data_dir="${raw_data_dir}/pytorch"
 
 # Loss selection
-echo "Select Loss:"
-echo "  1) CrossEntropy (default)"
-echo "  2) Circle"
-echo "  3) Triplet"
-echo "  4) ArcFace"
-echo "  5) CosFace"
-echo "  6) Contrast"
-echo "  7) Instance"
-echo "  8) Instance-ID"
-echo "  9) Lifted"
-echo "  10) Sphere"
-read -r -p "Enter loss number [1]: " loss_choice
-loss_choice="${loss_choice:-1}"
+loss_options=(
+  "1) CrossEntropy (default)"
+  "2) Circle"
+  "3) Triplet"
+  "4) ArcFace"
+  "5) CosFace"
+  "6) Contrast"
+  "7) Instance"
+  "8) Instance-ID"
+  "9) Lifted"
+  "10) Sphere"
+)
+select_with_arrows loss_choice "Select Loss (use Up/Down and Enter):" "${loss_options[@]}"
 
 case "$loss_choice" in
   1) loss_name="ce"; loss_flags=() ;;
