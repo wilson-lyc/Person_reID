@@ -6,6 +6,7 @@ cd "$SCRIPT_DIR"
 
 # Copyright:
 # Script built by Wilson: https://github.com/wilson-lyc
+# Co-developed with Codex (OpenAI)
 # Project codebase: https://github.com/layumi/Person_reID_baseline_pytorch
 
 print_banner() {
