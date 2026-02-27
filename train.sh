@@ -285,7 +285,21 @@ ensure_ibn_checkpoint() {
 
   rm -f "$tmp_path"
   echo "Downloading IBN checkpoint via ${download_source} URL..."
-  if python - "$download_url" "$tmp_path" <<'PY'
+  if command -v curl >/dev/null 2>&1; then
+    # Show progress with curl when available.
+    if curl -L --fail --progress-bar "$download_url" -o "$tmp_path"; then
+      mv "$tmp_path" "$checkpoint_path"
+      echo "IBN checkpoint downloaded from ${download_source} URL."
+      return 0
+    fi
+  elif command -v wget >/dev/null 2>&1; then
+    # Fallback with wget progress display.
+    if wget --show-progress -O "$tmp_path" "$download_url"; then
+      mv "$tmp_path" "$checkpoint_path"
+      echo "IBN checkpoint downloaded from ${download_source} URL."
+      return 0
+    fi
+  elif python - "$download_url" "$tmp_path" <<'PY'
 import shutil
 import sys
 import urllib.request
@@ -297,9 +311,12 @@ with urllib.request.urlopen(request, timeout=120) as resp, open(output, "wb") as
     shutil.copyfileobj(resp, f)
 PY
   then
+    echo "Downloaded by Python fallback (no progress bar shown)."
     mv "$tmp_path" "$checkpoint_path"
     echo "IBN checkpoint downloaded from ${download_source} URL."
     return 0
+  else
+    echo "No curl/wget available, and Python fallback download failed."
   fi
 
   rm -f "$tmp_path"
