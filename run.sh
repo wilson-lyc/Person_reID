@@ -1,7 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Copyright:
+# Script built by Wilson: https://github.com/wilson-lyc
+# Project codebase: https://github.com/layumi/Person_reID_baseline_pytorch
+
+print_banner() {
+cat <<'EOF'
+██████╗ ███████╗██████╗ ███████╗ ██████╗ ███╗   ██╗    ██████╗ ███████╗██╗██████╗
+██╔══██╗██╔════╝██╔══██╗██╔════╝██╔═══██╗████╗  ██║    ██╔══██╗██╔════╝██║██╔══██╗
+██████╔╝█████╗  ██████╔╝███████╗██║   ██║██╔██╗ ██║    ██████╔╝█████╗  ██║██║  ██║
+██╔═══╝ ██╔══╝  ██╔══██╗╚════██║██║   ██║██║╚██╗██║    ██╔══██╗██╔══╝  ██║██║  ██║
+██║     ███████╗██║  ██║███████║╚██████╔╝██║ ╚████║    ██║  ██║███████╗██║██████╔╝
+╚═╝     ╚══════╝╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═╝  ╚═══╝    ╚═╝  ╚═╝╚══════╝╚═╝╚═════╝
+EOF
+}
+
 clear
+print_banner
+echo "Script by Wilson: https://github.com/wilson-lyc"
+echo "Project codebase: https://github.com/layumi/Person_reID_baseline_pytorch"
+echo
 
 echo "Select Backbone:"
 echo "  1) ResNet50 (baseline)"
@@ -83,6 +102,10 @@ run_name="${run_name:-$default_run_name}"
 run_id="$(python tool/run_id.py)"
 
 clear
+print_banner
+echo "Script by Wilson: https://github.com/wilson-lyc"
+echo "Project codebase: https://github.com/layumi/Person_reID_baseline_pytorch"
+echo
 
 echo "----------------------------------------"
 echo "backbone   : $backbone"
