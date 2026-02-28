@@ -447,6 +447,19 @@ gpu_ids="0"
 read -r -p "GPU ids [0]: " input_gpu_ids
 gpu_ids="${input_gpu_ids:-$gpu_ids}"
 
+echo
+echo "Random Erasing (erasing_p) controls random occlusion augmentation probability during training."
+echo "Value range: 0.0 ~ 1.0, where 0 means disabled."
+erasing_p="0"
+while true; do
+  read -r -p "Random Erasing probability erasing_p [0]: " input_erasing_p
+  erasing_p="${input_erasing_p:-0}"
+  if [[ "$erasing_p" =~ ^([0-9]+(\.[0-9]+)?|\.[0-9]+)$ ]] && awk "BEGIN {exit !($erasing_p >= 0 && $erasing_p <= 1)}"; then
+    break
+  fi
+  echo "Invalid erasing_p: ${erasing_p}. Please enter a number in [0, 1]."
+done
+
 read -r -p "Which epoch for test [last]: " which_epoch
 which_epoch="${which_epoch:-last}"
 
@@ -468,6 +481,7 @@ echo "run_id: $run_id"
 echo "backbone      : $backbone"
 echo "dataset       : $dataset"
 echo "loss          : $loss_name"
+echo "erasing_p     : $erasing_p"
 echo "run_name      : $run_name"
 echo "hf_mirror     : $HF_MIRROR_STATUS"
 echo "ibn_mirror    : $IBN_MIRROR_STATUS"
@@ -490,6 +504,7 @@ ensure_ibn_checkpoint "$backbone"
 # Build train/test commands from selected options.
 train_cmd=(python train.py --gpu_ids "$gpu_ids" --name "$run_name" --data_dir "$data_dir" --run_id "$run_id")
 train_cmd+=(--train_all)
+train_cmd+=(--erasing_p "$erasing_p")
 train_cmd+=("${backbone_flags[@]}")
 train_cmd+=("${loss_flags[@]}")
 
