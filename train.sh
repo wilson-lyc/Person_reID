@@ -457,6 +457,41 @@ while true; do
   echo "Invalid warm_epoch: ${warm_epoch}. Please enter a non-negative integer."
 done
 
+default_stride="2"
+
+echo
+echo "Stride controls the final downsampling stride in the backbone."
+while true; do
+  read -r -p "stride [${default_stride}]: " input_stride
+  stride="${input_stride:-$default_stride}"
+  if [[ "$stride" =~ ^[1-9][0-9]*$ ]]; then
+    break
+  fi
+  echo "Invalid stride: ${stride}. Please enter a positive integer."
+done
+
+default_batchsize="32"
+default_lr="0.05"
+
+echo
+while true; do
+  read -r -p "batchsize [${default_batchsize}]: " input_batchsize
+  batchsize="${input_batchsize:-$default_batchsize}"
+  if [[ "$batchsize" =~ ^[1-9][0-9]*$ ]]; then
+    break
+  fi
+  echo "Invalid batchsize: ${batchsize}. Please enter a positive integer."
+done
+
+while true; do
+  read -r -p "lr [${default_lr}]: " input_lr
+  lr="${input_lr:-$default_lr}"
+  if [[ "$lr" =~ ^([0-9]+([.][0-9]+)?|[.][0-9]+)$ ]] && awk "BEGIN {exit !($lr > 0)}"; then
+    break
+  fi
+  echo "Invalid lr: ${lr}. Please enter a positive number."
+done
+
 gpu_ids="0"
 read -r -p "GPU ids [0]: " input_gpu_ids
 gpu_ids="${input_gpu_ids:-$gpu_ids}"
@@ -496,6 +531,9 @@ echo "backbone      : $backbone"
 echo "dataset       : $dataset"
 echo "loss          : $loss_name"
 echo "warm_epoch    : $warm_epoch"
+echo "stride        : $stride"
+echo "batchsize     : $batchsize"
+echo "lr            : $lr"
 echo "erasing_p     : $erasing_p"
 echo "run_name      : $run_name"
 echo "hf_mirror     : $HF_MIRROR_STATUS"
@@ -521,6 +559,9 @@ train_cmd=(python train.py --gpu_ids "$gpu_ids" --name "$run_name" --data_dir "$
 train_cmd+=(--train_all)
 train_cmd+=(--erasing_p "$erasing_p")
 train_cmd+=(--warm_epoch "$warm_epoch")
+train_cmd+=(--stride "$stride")
+train_cmd+=(--batchsize "$batchsize")
+train_cmd+=(--lr "$lr")
 train_cmd+=("${backbone_flags[@]}")
 train_cmd+=("${loss_flags[@]}")
 
