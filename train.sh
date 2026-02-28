@@ -113,6 +113,52 @@ confirmer() {
   done
 }
 
+# Parameter input with colored confirmation (similar to select_menu).
+inputer() {
+  local __outvar="$1"
+  local label="$2"
+  local default_value="$3"
+  local regex="${4:-}"
+  local range_expr="${5:-}"
+  local err_msg="${6:-Invalid input.}"
+  local value=""
+  local ok=1
+  local color_selected=""
+  local color_reset=""
+
+  if [[ -t 1 ]]; then
+    color_selected="\033[1;36m"
+    color_reset="\033[0m"
+  fi
+
+  while true; do
+    read -r -p "${label} [${default_value}]: " value
+    value="${value:-$default_value}"
+    ok=1
+
+    if [[ -n "$regex" ]] && [[ ! "$value" =~ $regex ]]; then
+      ok=0
+    fi
+    if [[ $ok -eq 1 && -n "$range_expr" ]] && ! awk -v v="$value" "BEGIN {exit !($range_expr)}"; then
+      ok=0
+    fi
+
+    if [[ $ok -eq 1 ]]; then
+      break
+    fi
+    echo "$err_msg"
+  done
+
+  if [[ -t 1 ]]; then
+    printf "\033[1A\r\033[2K"
+    printf "%s %b%s%b\n" "$label" "$color_selected" "$value" "$color_reset"
+  else
+    echo "${label} ${value}"
+  fi
+
+  printf -v "$__outvar" '%s' "$value"
+}
+
 # Mirror config status shown in run confirmation.
 HF_MIRROR_STATUS="N/A"
 IBN_MIRROR_STATUS="N/A"
@@ -444,80 +490,30 @@ case "$loss_choice" in
 esac
 
 default_warm_epoch="5"
-
-echo
-echo "Warmup runs for the first K epochs (warm_epoch)."
-echo "Use 0 to disable warmup."
-while true; do
-  read -r -p "warm_epoch [${default_warm_epoch}]: " input_warm_epoch
-  warm_epoch="${input_warm_epoch:-$default_warm_epoch}"
-  if [[ "$warm_epoch" =~ ^[0-9]+$ ]]; then
-    break
-  fi
-  echo "Invalid warm_epoch: ${warm_epoch}. Please enter a non-negative integer."
-done
+inputer warm_epoch "warm_epoch" "$default_warm_epoch" '^[0-9]+$' "" "Invalid warm_epoch: please enter a non-negative integer."
 
 default_stride="2"
+inputer stride "stride" "$default_stride" '^[1-9][0-9]*$' "" "Invalid stride: please enter a positive integer."
 
-echo
-echo "Stride controls the final downsampling stride in the backbone."
-while true; do
-  read -r -p "stride [${default_stride}]: " input_stride
-  stride="${input_stride:-$default_stride}"
-  if [[ "$stride" =~ ^[1-9][0-9]*$ ]]; then
-    break
-  fi
-  echo "Invalid stride: ${stride}. Please enter a positive integer."
-done
+erasing_p="0"
+inputer erasing_p "erasing_p" "0" '^([0-9]+([.][0-9]+)?|[.][0-9]+)$' "v >= 0 && v <= 1" "Invalid erasing_p: please enter a number in [0, 1]."
 
 default_batchsize="32"
 default_lr="0.05"
 
-echo
-while true; do
-  read -r -p "batchsize [${default_batchsize}]: " input_batchsize
-  batchsize="${input_batchsize:-$default_batchsize}"
-  if [[ "$batchsize" =~ ^[1-9][0-9]*$ ]]; then
-    break
-  fi
-  echo "Invalid batchsize: ${batchsize}. Please enter a positive integer."
-done
-
-while true; do
-  read -r -p "lr [${default_lr}]: " input_lr
-  lr="${input_lr:-$default_lr}"
-  if [[ "$lr" =~ ^([0-9]+([.][0-9]+)?|[.][0-9]+)$ ]] && awk "BEGIN {exit !($lr > 0)}"; then
-    break
-  fi
-  echo "Invalid lr: ${lr}. Please enter a positive number."
-done
+inputer batchsize "batchsize" "$default_batchsize" '^[1-9][0-9]*$' "" "Invalid batchsize: please enter a positive integer."
+inputer lr "lr" "$default_lr" '^([0-9]+([.][0-9]+)?|[.][0-9]+)$' "v > 0" "Invalid lr: please enter a positive number."
 
 gpu_ids="0"
-read -r -p "GPU ids [0]: " input_gpu_ids
-gpu_ids="${input_gpu_ids:-$gpu_ids}"
+inputer gpu_ids "gpu_ids" "$gpu_ids"
 
-echo
-echo "Random Erasing (erasing_p) controls random occlusion augmentation probability during training."
-echo "Value range: 0.0 ~ 1.0, where 0 means disabled."
-erasing_p="0"
-while true; do
-  read -r -p "Random Erasing probability erasing_p [0]: " input_erasing_p
-  erasing_p="${input_erasing_p:-0}"
-  if [[ "$erasing_p" =~ ^([0-9]+(\.[0-9]+)?|\.[0-9]+)$ ]] && awk "BEGIN {exit !($erasing_p >= 0 && $erasing_p <= 1)}"; then
-    break
-  fi
-  echo "Invalid erasing_p: ${erasing_p}. Please enter a number in [0, 1]."
-done
-
-read -r -p "Which epoch for test [last]: " which_epoch
-which_epoch="${which_epoch:-last}"
+inputer which_epoch "which_epoch" "last"
 
 run_id="$(python tool/run_id.py)"
 lr_tag="${lr//./p}"
 erasing_tag="${erasing_p//./p}"
 default_run_name="${backbone}_${dataset}_${loss_name}_w${warm_epoch}_s${stride}_b${batchsize}_lr${lr_tag}_re${erasing_tag}_${run_id}"
-read -r -p "Run name [${default_run_name}]: " run_name
-run_name="${run_name:-$default_run_name}"
+inputer run_name "run_name" "$default_run_name"
 
 # Configure mirror options before run confirmation.
 mirror_config_hf "$backbone"
@@ -534,9 +530,9 @@ echo "dataset       : $dataset"
 echo "loss          : $loss_name"
 echo "warm_epoch    : $warm_epoch"
 echo "stride        : $stride"
+echo "erasing_p     : $erasing_p"
 echo "batchsize     : $batchsize"
 echo "lr            : $lr"
-echo "erasing_p     : $erasing_p"
 echo "run_name      : $run_name"
 echo "hf_mirror     : $HF_MIRROR_STATUS"
 echo "ibn_mirror    : $IBN_MIRROR_STATUS"
