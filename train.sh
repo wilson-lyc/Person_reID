@@ -513,7 +513,9 @@ read -r -p "Which epoch for test [last]: " which_epoch
 which_epoch="${which_epoch:-last}"
 
 run_id="$(python tool/run_id.py)"
-default_run_name="${backbone}_${dataset}_${loss_name}_${run_id}"
+lr_tag="${lr//./p}"
+erasing_tag="${erasing_p//./p}"
+default_run_name="${backbone}_${dataset}_${loss_name}_w${warm_epoch}_s${stride}_b${batchsize}_lr${lr_tag}_re${erasing_tag}_${run_id}"
 read -r -p "Run name [${default_run_name}]: " run_name
 run_name="${run_name:-$default_run_name}"
 
