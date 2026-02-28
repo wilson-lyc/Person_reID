@@ -10,7 +10,7 @@ cd "$SCRIPT_DIR"
 # Project codebase: https://github.com/layumi/Person_reID_baseline_pytorch
 
 # =========================
-# UI / display helpers
+# UI Tools
 # =========================
 print_banner() {
 cat <<'EOF'
@@ -29,7 +29,8 @@ print_project_info() {
   echo
 }
 
-select_option_by_number() {
+# Multi-option select menu
+select_menu() {
   local __outvar="$1"
   local title="$2"
   local default_choice="$3"
@@ -39,6 +40,13 @@ select_option_by_number() {
   local selected_idx=0
   local selected_text=""
   local input_prompt="Enter choice [${default_choice}]: "
+  local color_selected=""
+  local color_reset=""
+
+  if [[ -t 1 ]]; then
+    color_selected="\033[1;36m"
+    color_reset="\033[0m"
+  fi
 
   echo "$title"
   for i in "${!options[@]}"; do
@@ -63,61 +71,52 @@ select_option_by_number() {
     printf "\033[%dA" "$(( ${#options[@]} + 2 ))"
     printf "\033[J"
   fi
-  echo "${title} ${selected_text}"
+  printf "%s %b%s%b\n" "$title" "$color_selected" "$selected_text" "$color_reset"
   printf -v "$__outvar" '%s' "$choice"
 }
 
-# Prompt helper: only accept `Y` or `n` (empty input defaults to `Y`).
-ask_yes_no_default_yes() {
+# Yes/No confirmer
+confirmer() {
   local prompt="$1"
+  local default_choice="$2"
   local answer
+  local prompt_suffix=""
+  local default_answer=""
+
+  case "$default_choice" in
+    yes)
+      prompt_suffix="[Y/n]"
+      default_answer="Y"
+      ;;
+    no)
+      prompt_suffix="[y/N]"
+      default_answer="n"
+      ;;
+    *)
+      echo "Invalid default option for confirmer: ${default_choice} (expected yes or no)."
+      return 1
+      ;;
+  esac
+
   while true; do
-    read -r -p "${prompt} [Y/n]: " answer
-    answer="${answer:-Y}"
+    read -r -p "${prompt} ${prompt_suffix}: " answer
+    answer="${answer:-$default_answer}"
     case "$answer" in
       Y|n)
         printf '%s\n' "$answer"
         return 0
         ;;
       *)
-        echo "Invalid input. Please enter exactly 'Y' or 'n'."
+        echo "Invalid input. Please enter exactly 'Y' or 'n' (or press Enter for default)."
         ;;
     esac
   done
 }
 
-dataset_display_name() {
-  local ds_name="$1"
-  case "$ds_name" in
-    market) echo "Market-1501" ;;
-    duke) echo "DukeMTMC-reID" ;;
-    msmt17) echo "MSMT17" ;;
-    cub) echo "CUB-200-2011" ;;
-    vehicleid) echo "VehicleID" ;;
-    veri) echo "VeRi" ;;
-    viper) echo "VIPeR" ;;
-    *) echo "$ds_name" ;;
-  esac
-}
-
-backbone_display_name() {
-  local bb_name="$1"
-  case "$bb_name" in
-    resnet50) echo "ResNet50" ;;
-    resnet50_ibn) echo "ResNet50-IBN" ;;
-    densenet) echo "DenseNet121" ;;
-    swin) echo "Swin" ;;
-    swinv2) echo "SwinV2" ;;
-    dino) echo "DINOv3" ;;
-    efficientnet_b4) echo "EfficientNet-B4" ;;
-    nas) echo "NAS" ;;
-    hrnet) echo "HRNet" ;;
-    convnext) echo "ConvNeXt" ;;
-    pcb) echo "PCB (ResNet50+PCB)" ;;
-    resnet50_usam) echo "ResNet50-USAM" ;;
-    *) echo "$bb_name" ;;
-  esac
-}
+# Mirror config status shown in run confirmation.
+HF_MIRROR_STATUS="N/A"
+IBN_MIRROR_STATUS="N/A"
+IBN_DOWNLOAD_SOURCE="direct"
 
 # =========================
 # Dataset preparation
@@ -126,12 +125,10 @@ print_manual_dataset_tutorial() {
   local ds_name="$1"
   local raw_dir="$2"
   local prepared_dir="$3"
-  local ds_display
-  ds_display="$(dataset_display_name "$ds_name")"
 
   echo
   echo "================ MANUAL DATASET PREPARATION GUIDE ================"
-  echo "[Dataset] ${ds_display} (${ds_name})"
+  echo "[Dataset] ${ds_name}"
   echo "Raw path should be: ${raw_dir}"
   echo "Please prepare the raw dataset folders/files under the path above."
   echo "Expected prepared path:"
@@ -149,7 +146,7 @@ dataset_has_required_structure() {
     market|duke)
       [[ -d "${path}/query" && -d "${path}/bounding_box_train" && -d "${path}/bounding_box_test" ]]
       ;;
-    msmt17)
+    msmt)
       [[ -d "${path}/train" && -d "${path}/test" \
          && -f "${path}/list_train.txt" && -f "${path}/list_val.txt" \
          && -f "${path}/list_query.txt" && -f "${path}/list_gallery.txt" ]]
@@ -216,7 +213,7 @@ ensure_dataset_ready() {
 # =========================
 # Network / model source config
 # =========================
-configure_hf_endpoint_for_timm_models() {
+mirror_config_hf() {
   local selected_backbone="$1"
   local backbone_tip
   local use_hf_mirror
@@ -229,6 +226,7 @@ configure_hf_endpoint_for_timm_models() {
       backbone_tip="ConvNeXt"
       ;;
     *)
+      HF_MIRROR_STATUS="N/A"
       return 0
       ;;
   esac
@@ -237,17 +235,42 @@ configure_hf_endpoint_for_timm_models() {
     echo "Current HF_ENDPOINT: ${HF_ENDPOINT}"
   fi
 
-  use_hf_mirror="$(ask_yes_no_default_yes "${backbone_tip} may download weights from Hugging Face. Use mirror (https://hf-mirror.com)?")"
+  use_hf_mirror="$(confirmer "${backbone_tip} may download weights from Hugging Face. Use mirror (https://hf-mirror.com)?" "yes")"
   case "$use_hf_mirror" in
     Y)
       export HF_ENDPOINT="https://hf-mirror.com"
+      HF_MIRROR_STATUS="enabled"
       echo "Using mirror endpoint: ${HF_ENDPOINT}"
       ;;
     n)
       if [[ -n "${HF_ENDPOINT:-}" ]]; then
         unset HF_ENDPOINT
       fi
+      HF_MIRROR_STATUS="disabled"
       echo "Using direct Hugging Face endpoint."
+      ;;
+  esac
+}
+
+mirror_config_ibn() {
+  local selected_backbone="$1"
+  local use_mirror_confirm
+
+  if [[ "$selected_backbone" != "resnet50_ibn" ]]; then
+    IBN_MIRROR_STATUS="N/A"
+    IBN_DOWNLOAD_SOURCE="direct"
+    return 0
+  fi
+
+  use_mirror_confirm="$(confirmer "Use mirror URL for IBN checkpoint download?" "yes")"
+  case "$use_mirror_confirm" in
+    Y)
+      IBN_DOWNLOAD_SOURCE="mirror"
+      IBN_MIRROR_STATUS="enabled"
+      ;;
+    n)
+      IBN_DOWNLOAD_SOURCE="direct"
+      IBN_MIRROR_STATUS="disabled"
       ;;
   esac
 }
@@ -264,9 +287,8 @@ ensure_ibn_checkpoint() {
   local direct_url="https://github.com/XingangPan/IBN-Net/releases/download/v1.0/resnet50_ibn_a-d9d0bb7b.pth"
   local mirror_url="https://ghfast.top/?q=https://github.com/XingangPan/IBN-Net/releases/download/v1.0/resnet50_ibn_a-d9d0bb7b.pth"
   local tmp_path="${checkpoint_path}.tmp"
-  local use_mirror_confirm
   local download_url
-  local download_source
+  local download_source="${IBN_DOWNLOAD_SOURCE:-direct}"
 
   if [[ -s "$checkpoint_path" ]]; then
     echo "IBN checkpoint already exists: ${checkpoint_path}"
@@ -282,17 +304,12 @@ ensure_ibn_checkpoint() {
     return 1
   fi
 
-  use_mirror_confirm="$(ask_yes_no_default_yes "Use mirror URL for IBN checkpoint download?")"
-  case "$use_mirror_confirm" in
-    Y)
-      download_url="$mirror_url"
-      download_source="mirror"
-      ;;
-    n)
-      download_url="$direct_url"
-      download_source="direct"
-      ;;
-  esac
+  if [[ "$download_source" == "mirror" ]]; then
+    download_url="$mirror_url"
+  else
+    download_source="direct"
+    download_url="$direct_url"
+  fi
 
   rm -f "$tmp_path"
   echo "Downloading IBN checkpoint via ${download_source} URL..."
@@ -337,7 +354,7 @@ print_banner
 print_project_info
 
 # Backbone selection
-select_option_by_number backbone_choice "Select Backbone:" "1" \
+select_menu backbone_choice "Select Backbone:" "1" \
   "ResNet50 (baseline, default)" \
   "ResNet50-IBN" \
   "DenseNet121" \
@@ -369,10 +386,9 @@ case "$backbone_choice" in
     exit 1
     ;;
 esac
-backbone_display="$(backbone_display_name "$backbone")"
 
 # Dataset selection and corresponding prepare script
-select_option_by_number dataset_choice "Select Dataset:" "1" \
+select_menu dataset_choice "Select Dataset:" "1" \
   "Market-1501 (default)" \
   "DukeMTMC-reID" \
   "MSMT17" \
@@ -384,7 +400,7 @@ select_option_by_number dataset_choice "Select Dataset:" "1" \
 case "$dataset_choice" in
   1) dataset="market";    raw_data_dir="./data/Market";    prepare_script="prepare.py" ;;
   2) dataset="duke";      raw_data_dir="./data/Duke";      prepare_script="prepare_Duke.py" ;;
-  3) dataset="msmt17";    raw_data_dir="./data/MSMT17";    prepare_script="prepare_MSMT.py" ;;
+  3) dataset="msmt";      raw_data_dir="./data/MSMT";      prepare_script="prepare_MSMT.py" ;;
   4) dataset="cub";       raw_data_dir="./data/CUB";       prepare_script="prepare_CUB.py" ;;
   5) dataset="vehicleid"; raw_data_dir="./data/VehicleID"; prepare_script="prepare_VehicleID.py" ;;
   6) dataset="veri";      raw_data_dir="./data/VeRi";      prepare_script="prepare_VeRi.py" ;;
@@ -394,12 +410,11 @@ case "$dataset_choice" in
     exit 1
     ;;
 esac
-dataset_display="$(dataset_display_name "$dataset")"
 
 data_dir="${raw_data_dir}/pytorch"
 
 # Loss selection
-select_option_by_number loss_choice "Select Loss:" "1" \
+select_menu loss_choice "Select Loss:" "1" \
   "CrossEntropy (default)" \
   "Circle" \
   "Triplet" \
@@ -440,26 +455,24 @@ default_run_name="${backbone}_${dataset}_${loss_name}_${run_id}"
 read -r -p "Run name [${default_run_name}]: " run_name
 run_name="${run_name:-$default_run_name}"
 
+# Configure mirror options before run confirmation.
+mirror_config_hf "$backbone"
+mirror_config_ibn "$backbone"
+
 # =========================
 # Run confirmation
 # =========================
-clear
-print_banner
-print_project_info
 
 echo "----------------------------------------"
-echo "backbone      : $backbone_display ($backbone)"
-echo "dataset       : $dataset_display ($dataset)"
-echo "prepare_script: $prepare_script"
-echo "raw_data_dir  : $raw_data_dir"
-echo "data_dir      : $data_dir"
+echo "run_id: $run_id"
+echo "backbone      : $backbone"
+echo "dataset       : $dataset"
 echo "loss          : $loss_name"
 echo "run_name      : $run_name"
-echo "run_id        : $run_id"
-echo "gpu_ids       : $gpu_ids"
-echo "which_epoch   : $which_epoch"
+echo "hf_mirror     : $HF_MIRROR_STATUS"
+echo "ibn_mirror    : $IBN_MIRROR_STATUS"
 echo "----------------------------------------"
-confirm_run="$(ask_yes_no_default_yes "Confirm and start train+evaluate workflow?")"
+confirm_run="$(confirmer "Confirm and start train+evaluate workflow?" "yes")"
 case "$confirm_run" in
   Y)
     ;;
@@ -472,8 +485,6 @@ esac
 # =========================
 # Runtime setup and execution
 # =========================
-# Configure HF mirror for timm backbones that may fetch weights from Hugging Face.
-configure_hf_endpoint_for_timm_models "$backbone"
 ensure_ibn_checkpoint "$backbone"
 
 # Build train/test commands from selected options.
