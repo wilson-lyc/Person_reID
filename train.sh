@@ -216,14 +216,28 @@ ensure_dataset_ready() {
 # =========================
 # Network / model source config
 # =========================
-configure_hf_endpoint_for_hrnet() {
+configure_hf_endpoint_for_timm_models() {
   local selected_backbone="$1"
+  local backbone_tip
   local use_hf_mirror
-  if [[ "$selected_backbone" != "hrnet" ]]; then
-    return 0
+
+  case "$selected_backbone" in
+    hrnet)
+      backbone_tip="HRNet"
+      ;;
+    convnext)
+      backbone_tip="ConvNeXt"
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+
+  if [[ -n "${HF_ENDPOINT:-}" ]]; then
+    echo "Current HF_ENDPOINT: ${HF_ENDPOINT}"
   fi
 
-  use_hf_mirror="$(ask_yes_no_default_yes "HRNet may download weights from Hugging Face. Use mirror (https://hf-mirror.com)?")"
+  use_hf_mirror="$(ask_yes_no_default_yes "${backbone_tip} may download weights from Hugging Face. Use mirror (https://hf-mirror.com)?")"
   case "$use_hf_mirror" in
     Y)
       export HF_ENDPOINT="https://hf-mirror.com"
@@ -458,8 +472,8 @@ esac
 # =========================
 # Runtime setup and execution
 # =========================
-# Configure network mirror for HRNet download and ensure IBN checkpoint.
-configure_hf_endpoint_for_hrnet "$backbone"
+# Configure HF mirror for timm backbones that may fetch weights from Hugging Face.
+configure_hf_endpoint_for_timm_models "$backbone"
 ensure_ibn_checkpoint "$backbone"
 
 # Build train/test commands from selected options.
