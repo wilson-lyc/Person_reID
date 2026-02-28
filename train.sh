@@ -428,7 +428,7 @@ select_menu loss_choice "Select Loss:" "1" \
 
 case "$loss_choice" in
   1) loss_name="ce"; loss_flags=() ;;
-  2) loss_name="circle"; loss_flags=(--circle --warm_epoch 5) ;;
+  2) loss_name="circle"; loss_flags=(--circle) ;;
   3) loss_name="triplet"; loss_flags=(--triplet) ;;
   4) loss_name="arcface"; loss_flags=(--arcface) ;;
   5) loss_name="cosface"; loss_flags=(--cosface) ;;
@@ -442,6 +442,20 @@ case "$loss_choice" in
     exit 1
     ;;
 esac
+
+default_warm_epoch="5"
+
+echo
+echo "Warmup runs for the first K epochs (warm_epoch)."
+echo "Use 0 to disable warmup."
+while true; do
+  read -r -p "warm_epoch [${default_warm_epoch}]: " input_warm_epoch
+  warm_epoch="${input_warm_epoch:-$default_warm_epoch}"
+  if [[ "$warm_epoch" =~ ^[0-9]+$ ]]; then
+    break
+  fi
+  echo "Invalid warm_epoch: ${warm_epoch}. Please enter a non-negative integer."
+done
 
 gpu_ids="0"
 read -r -p "GPU ids [0]: " input_gpu_ids
@@ -481,6 +495,7 @@ echo "run_id: $run_id"
 echo "backbone      : $backbone"
 echo "dataset       : $dataset"
 echo "loss          : $loss_name"
+echo "warm_epoch    : $warm_epoch"
 echo "erasing_p     : $erasing_p"
 echo "run_name      : $run_name"
 echo "hf_mirror     : $HF_MIRROR_STATUS"
@@ -505,6 +520,7 @@ ensure_ibn_checkpoint "$backbone"
 train_cmd=(python train.py --gpu_ids "$gpu_ids" --name "$run_name" --data_dir "$data_dir" --run_id "$run_id")
 train_cmd+=(--train_all)
 train_cmd+=(--erasing_p "$erasing_p")
+train_cmd+=(--warm_epoch "$warm_epoch")
 train_cmd+=("${backbone_flags[@]}")
 train_cmd+=("${loss_flags[@]}")
 
