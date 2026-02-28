@@ -524,7 +524,7 @@ mirror_config_ibn "$backbone"
 # =========================
 
 echo "----------------------------------------"
-echo "run_id: $run_id"
+echo "run_id        : $run_id"
 echo "backbone      : $backbone"
 echo "dataset       : $dataset"
 echo "loss          : $loss_name"
