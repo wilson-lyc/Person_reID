@@ -151,9 +151,9 @@ inputer() {
 
   if [[ -t 1 ]]; then
     printf "\033[1A\r\033[2K"
-    printf "%s %b%s%b\n" "$label" "$color_selected" "$value" "$color_reset"
+    printf "%s: %b%s%b\n" "$label" "$color_selected" "$value" "$color_reset"
   else
-    echo "${label} ${value}"
+    echo "${label}: ${value}"
   fi
 
   printf -v "$__outvar" '%s' "$value"
