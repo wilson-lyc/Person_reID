@@ -367,7 +367,7 @@ if use_gpu:
     model = model.cuda()
 
 
-print("fuse conv+bn for faster inference")
+# print("fuse conv+bn for faster inference")
 model = fuse_all_conv_bn(model)
 
 # We can optionally trace the forward method with PyTorch JIT so it runs faster.
