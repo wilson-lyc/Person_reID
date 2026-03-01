@@ -2,7 +2,15 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+cd "$REPO_ROOT"
+
+COMMON_LIB="${SCRIPT_DIR}/common.sh"
+if [[ ! -f "$COMMON_LIB" ]]; then
+  echo "Missing shared shell library: ${COMMON_LIB}"
+  exit 1
+fi
+source "$COMMON_LIB"
 
 # Copyright:
 # Script built by Wilson: https://github.com/wilson-lyc
@@ -73,50 +81,6 @@ select_menu() {
   fi
   printf "%s %b%s%b\n" "$title" "$color_selected" "$selected_text" "$color_reset"
   printf -v "$__outvar" '%s' "$choice"
-}
-
-# Yes/No confirmer
-confirmer() {
-  local prompt="$1"
-  local default_choice="$2"
-  local answer
-  local prompt_suffix=""
-  local color_selected=""
-  local color_reset=""
-
-  if [[ -t 2 ]]; then
-    color_selected="\033[1;36m"
-    color_reset="\033[0m"
-  fi
-
-  case "$default_choice" in
-    y|n)
-      prompt_suffix="[y/n] (default: ${default_choice})"
-      ;;
-    *)
-      echo "Invalid default option for confirmer: ${default_choice} (expected y or n)."
-      return 1
-      ;;
-  esac
-
-  while true; do
-    read -r -p "${prompt} ${prompt_suffix}: " answer
-    answer="${answer:-$default_choice}"
-    answer="${answer,,}"
-    case "$answer" in
-      y|n)
-        if [[ -t 2 ]]; then
-          printf "\033[1A\r\033[2K" >&2
-          printf "%s: %b%s%b\n" "$prompt" "$color_selected" "$answer" "$color_reset" >&2
-        fi
-        printf '%s\n' "$answer"
-        return 0
-        ;;
-      *)
-        echo "Invalid input. Please enter 'y' or 'n' (case-insensitive), or press Enter for default."
-        ;;
-    esac
-  done
 }
 
 # Parameter inputer

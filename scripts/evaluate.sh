@@ -2,7 +2,15 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+cd "$REPO_ROOT"
+
+COMMON_LIB="${SCRIPT_DIR}/common.sh"
+if [[ ! -f "$COMMON_LIB" ]]; then
+  echo "Missing shared shell library: ${COMMON_LIB}"
+  exit 1
+fi
+source "$COMMON_LIB"
 
 print_banner() {
 cat <<'EOF'
@@ -111,38 +119,6 @@ inputer() {
   printf -v "$__outvar" '%s' "$value"
 }
 
-confirmer() {
-  local prompt="$1"
-  local default_choice="$2"
-  local answer
-  local prompt_suffix=""
-
-  case "$default_choice" in
-    y|n)
-      prompt_suffix="[y/n] (default: ${default_choice})"
-      ;;
-    *)
-      echo "Invalid default option for confirmer: ${default_choice} (expected y or n)."
-      return 1
-      ;;
-  esac
-
-  while true; do
-    read -r -p "${prompt} ${prompt_suffix}: " answer
-    answer="${answer:-$default_choice}"
-    answer="${answer,,}"
-    case "$answer" in
-      y|n)
-        printf '%s\n' "$answer"
-        return 0
-        ;;
-      *)
-        echo "Invalid input. Please enter 'y' or 'n' (case-insensitive), or press Enter for default."
-        ;;
-    esac
-  done
-}
-
 extract_data_dir_from_opts() {
   local opts_file="$1"
   local parsed=""
@@ -248,18 +224,16 @@ build_model_candidates() {
 clear
 print_banner
 
-echo "Scanning trained models under ./model ..."
+echo "Scanning the trained model ..."
 MODEL_NAMES=()
 MODEL_DESCS=()
 if ! build_model_candidates; then
-  echo "No valid trained models found in ./model."
-  echo "A valid model directory must contain opts.yaml and net_last.pth (or at least one net_*.pth)."
-  echo "Please train first, then rerun evaluate.sh."
+  echo "No trained model was found. Please run train.sh to train the model first."
   exit 1
 fi
 
 default_model_idx="${#MODEL_NAMES[@]}"
-select_menu model_choice "Select Model:" "$default_model_idx" "${MODEL_DESCS[@]}"
+select_menu model_choice "Select the model to evaluate:" "$default_model_idx" "${MODEL_DESCS[@]}"
 selected_index=$((model_choice - 1))
 name="${MODEL_NAMES[$selected_index]}"
 model_path="./model/${name}"
