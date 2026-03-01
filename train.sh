@@ -86,7 +86,7 @@ confirmer() {
   local color_reset=""
   local shown_answer=""
 
-  if [[ -t 1 ]]; then
+  if [[ -t 2 ]]; then
     color_selected="\033[1;36m"
     color_reset="\033[0m"
   fi
@@ -111,7 +111,7 @@ confirmer() {
     answer="${answer:-$default_answer}"
     case "$answer" in
       Y|n)
-        if [[ -t 1 ]]; then
+        if [[ -t 2 ]]; then
           if [[ "$answer" == "Y" ]]; then
             shown_answer="Y"
           else
