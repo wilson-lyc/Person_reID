@@ -37,52 +37,6 @@ EOF
   echo "============================================================"
 }
 
-# Multi-option select menu
-select_menu() {
-  local __outvar="$1"
-  local title="$2"
-  local default_choice="$3"
-  shift 3
-  local options=("$@")
-  local choice=""
-  local selected_idx=0
-  local selected_text=""
-  local input_prompt="Enter choice [${default_choice}]: "
-  local color_selected=""
-  local color_reset=""
-
-  if [[ -t 1 ]]; then
-    color_selected="\033[1;36m"
-    color_reset="\033[0m"
-  fi
-
-  echo "$title"
-  for i in "${!options[@]}"; do
-    printf "  %d) %s\n" "$((i + 1))" "${options[$i]}"
-  done
-
-  while true; do
-    read -r -p "${input_prompt}" choice
-    choice="${choice:-$default_choice}"
-    if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#options[@]} )); then
-      selected_idx=$((choice - 1))
-      selected_text="${options[$selected_idx]}"
-      break
-    fi
-    if [[ -t 1 ]]; then
-      printf "\033[1A\r\033[2K"
-    fi
-    input_prompt="Invalid choice (${choice}). Enter choice [${default_choice}]: "
-  done
-
-  if [[ -t 1 ]]; then
-    printf "\033[%dA" "$(( ${#options[@]} + 2 ))"
-    printf "\033[J"
-  fi
-  printf "%s %b%s%b\n" "$title" "$color_selected" "$selected_text" "$color_reset"
-  printf -v "$__outvar" '%s' "$choice"
-}
-
 # Parameter inputer
 inputer() {
   local __outvar="$1"

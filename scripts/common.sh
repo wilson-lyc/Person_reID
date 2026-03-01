@@ -1,50 +1,5 @@
 #!/usr/bin/env bash
 
-# Shared yes/no confirmer for interactive scripts.
-# Usage: confirmer "Prompt text" "y|n"
-confirmer() {
-  local prompt="$1"
-  local default_choice="$2"
-  local answer
-  local prompt_suffix=""
-  local color_selected=""
-  local color_reset=""
-
-  if [[ -t 2 ]]; then
-    color_selected="\033[1;36m"
-    color_reset="\033[0m"
-  fi
-
-  case "$default_choice" in
-    y|n)
-      prompt_suffix="[y/n] (default: ${default_choice})"
-      ;;
-    *)
-      echo "Invalid default option for confirmer: ${default_choice} (expected y or n)."
-      return 1
-      ;;
-  esac
-
-  while true; do
-    read -r -p "${prompt} ${prompt_suffix}: " answer
-    answer="${answer:-$default_choice}"
-    answer="${answer,,}"
-    case "$answer" in
-      y|n)
-        if [[ -t 2 ]]; then
-          printf "\033[1A\r\033[2K" >&2
-          printf "%s: %b%s%b\n" "$prompt" "$color_selected" "$answer" "$color_reset" >&2
-        fi
-        printf '%s\n' "$answer"
-        return 0
-        ;;
-      *)
-        echo "Invalid input. Please enter 'y' or 'n' (case-insensitive), or press Enter for default."
-        ;;
-    esac
-  done
-}
-
 # Interactive selector with arrow key support.
 # Usage:
 #   selector out_var "Question" "default_index_1_based" "Option A" "Option B" ...
@@ -155,4 +110,42 @@ selector() {
     printf "\r\033[%dA\033[J" "$rendered_lines"
   fi
   return 0
+}
+
+# Multi-option select menu wrapper based on selector.
+# Usage:
+#   select_menu out_var "Title" "default_index_1_based" "Option A" ...
+# Result:
+#   Writes selected 1-based index into out_var (compatible with legacy callers).
+select_menu() {
+  local __outvar="$1"
+  local title="$2"
+  local default_choice="$3"
+  shift 3
+  local options=("$@")
+  local selected_text=""
+
+  selector selected_text "$title" "$default_choice" "${options[@]}" || return 1
+  printf -v "$__outvar" '%s' "$SELECTOR_INDEX"
+}
+
+# Shared yes/no confirmer for interactive scripts, powered by selector.
+# Usage: confirmer "Prompt text" "y|n"
+confirmer() {
+  local prompt="$1"
+  local default_choice="$2"
+  local default_index="1"
+  local selected=""
+
+  case "$default_choice" in
+    y) default_index="1" ;;
+    n) default_index="2" ;;
+    *)
+      echo "Invalid default option for confirmer: ${default_choice} (expected y or n)."
+      return 1
+      ;;
+  esac
+
+  selector selected "$prompt" "$default_index" "y" "n" >&2 || return 1
+  printf '%s\n' "$selected"
 }

@@ -78,6 +78,17 @@ run_auto_tests() {
     fail "Invalid default index should return non-zero"
   fi
 
+  local menu_idx=""
+  select_menu menu_idx "Menu" "2" "A" "B" "C" <<< "" >/dev/null
+  assert_eq "$menu_idx" "2" "select_menu returns 1-based index via selector"
+
+  local yn=""
+  yn="$(confirmer "Proceed?" "n" <<< "")"
+  assert_eq "$yn" "n" "confirmer default choice works via selector"
+
+  yn="$(confirmer "Proceed?" "y" <<< "2")"
+  assert_eq "$yn" "n" "confirmer numeric input maps to n"
+
   echo
   echo "Auto test summary: pass=${pass_count}, fail=${fail_count}"
   if [[ $fail_count -ne 0 ]]; then
