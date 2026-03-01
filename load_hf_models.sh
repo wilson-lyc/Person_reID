@@ -139,7 +139,7 @@ clear
 print_banner
 echo
 
-select_menu backbone_choice "Select HF backbone to preload:" "1" \
+select_menu backbone_choice "Select backbone to preload from Hugging Face:" "1" \
   "Swin (swin_base_patch4_window7_224)" \
   "SwinV2 (swinv2_base_window8_256)" \
   "DINOv3 ViT-Base (vit_base_patch16_dinov3.lvd1689m)" \

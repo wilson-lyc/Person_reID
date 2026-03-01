@@ -1,5 +1,6 @@
 import argparse
 import os
+import sys
 import traceback
 
 import timm
@@ -7,6 +8,22 @@ import torch
 import torch.nn as nn
 
 MODEL_INPUT_SIZE = (256, 128)
+_ENABLE_COLOR = sys.stdout.isatty() and os.getenv("NO_COLOR") is None
+_COLOR_RESET = "\033[0m"
+_COLOR_MAP = {
+    "success": "\033[1;32m",
+    "fail": "\033[1;31m",
+    "info": "\033[1;36m",
+}
+
+
+def _log(tag: str, message: str) -> None:
+    label = f"[{tag}]"
+    if _ENABLE_COLOR:
+        color = _COLOR_MAP.get(tag, "")
+        if color:
+            label = f"{color}{label}{_COLOR_RESET}"
+    print(f"{label} {message}")
 
 
 def _force_cpu_only() -> None:
@@ -105,10 +122,8 @@ def main() -> int:
         targets.append("hrnet")
 
     if not targets:
-        print("[error] no backbone selected.")
-        print(
-            "Please pass at least one flag, e.g. --use_swin or --use_dino"
-        )
+        _log("fail", "no backbone selected.")
+        _log("info", "Please pass at least one flag, e.g. --use_swin or --use_dino")
         return 2
 
     failed: list[str] = []
@@ -127,14 +142,14 @@ def main() -> int:
                 preload_hrnet()
         except Exception:
             failed.append(target)
-            print(f"[error] failed target: {target}")
+            _log("fail", f"failed target: {target}")
             print(traceback.format_exc())
 
     if failed:
-        print(f"[done] finished with failures: {failed}")
+        _log("fail", f"finished with failures: {failed}")
         return 1
 
-    print("[done] all requested preloads succeeded.")
+    _log("success", "all requested preloads succeeded.")
     return 0
 
 
