@@ -327,7 +327,6 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
 
     for epoch in range(num_epochs):
         epoch_start = time.time()
-        print(f"Epoch [{epoch + 1}/{num_epochs}]")
         epoch_stats = {}
 
         if opt.wa and wa_flag and epoch >=  num_epochs*0.8:
@@ -346,7 +345,7 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
             # Keep batch feedback in tqdm; use compact epoch summary after each epoch.
             pbar = tqdm(
                 total=len(dataloaders[phase].dataset),
-                desc=phase,
+                desc=f"{phase} ({epoch + 1}/{num_epochs})",
                 leave=True,
             )
             ordered_dict = collections.OrderedDict(Loss="", Acc="")
@@ -553,7 +552,6 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
             f"val_loss={val_stat.get('loss', 0.0):.4f} val_acc={val_stat.get('acc', 0.0):.4f} | "
             f"best_val_acc={best_val_acc:.4f}"
         )
-        print()
         lark_log(
             project="Person_reID",
             file="train.py",
