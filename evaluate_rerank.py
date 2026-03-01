@@ -3,6 +3,7 @@ import torch
 import numpy as np
 import time
 from  re_ranking import re_ranking
+from datetime import datetime
 #######################################################################
 # Evaluate
 def evaluate(score,ql,qc,gl,gc):
@@ -52,6 +53,7 @@ def compute_mAP(index, good_index, junk_index):
 
 ######################################################################
 result = scipy.io.loadmat('pytorch_result.mat')
+print(f"Evaluation Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 query_feature = result['query_f']
 query_cam = result['query_cam'][0]
 query_label = result['query_label'][0]
@@ -82,3 +84,4 @@ for i in range(len(query_label)):
 CMC = CMC.float()
 CMC = CMC/len(query_label) #average CMC
 print('top1:%f top5:%f top10:%f mAP:%f'%(CMC[0],CMC[4],CMC[9],ap/len(query_label)))
+print()
