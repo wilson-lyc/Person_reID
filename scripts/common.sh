@@ -60,12 +60,8 @@ selector() {
   else
     while true; do
       if (( rendered_once == 1 )); then
-        # Restore to the selector block start and clear it before re-render.
-        printf "\033[u\033[J"
-        printf "\033[s"
-      else
-        # Save selector block start cursor position for stable cleanup.
-        printf "\033[s"
+        # Move back to selector start and clear old menu block before re-render.
+        printf "\033[%dA\033[J" "$rendered_lines"
       fi
       echo "$question"
       local idx
@@ -111,7 +107,7 @@ selector() {
 
   if [[ -t 0 && -t 1 && (( rendered_once == 1 )) ]]; then
     # Remove selector-rendered block first, then echo final selected value.
-    printf "\033[u\033[J"
+    printf "\r\033[%dA\033[J" "$rendered_lines"
     # Echo the final selected value after confirming with Enter.
     printf "%b%s%b\n" "$color_value" "$selected_value" "$color_reset"
   fi
