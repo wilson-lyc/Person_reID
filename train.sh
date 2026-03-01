@@ -81,10 +81,8 @@ confirmer() {
   local default_choice="$2"
   local answer
   local prompt_suffix=""
-  local default_answer=""
   local color_selected=""
   local color_reset=""
-  local shown_answer=""
 
   if [[ -t 2 ]]; then
     color_selected="\033[1;36m"
@@ -92,39 +90,30 @@ confirmer() {
   fi
 
   case "$default_choice" in
-    yes)
-      prompt_suffix="[Y/n]"
-      default_answer="Y"
-      ;;
-    no)
-      prompt_suffix="[y/N]"
-      default_answer="n"
+    y|n)
+      prompt_suffix="[y/n] (default: ${default_choice})"
       ;;
     *)
-      echo "Invalid default option for confirmer: ${default_choice} (expected yes or no)."
+      echo "Invalid default option for confirmer: ${default_choice} (expected y or n)."
       return 1
       ;;
   esac
 
   while true; do
     read -r -p "${prompt} ${prompt_suffix}: " answer
-    answer="${answer:-$default_answer}"
+    answer="${answer:-$default_choice}"
+    answer="${answer,,}"
     case "$answer" in
-      Y|n)
+      y|n)
         if [[ -t 2 ]]; then
-          if [[ "$answer" == "Y" ]]; then
-            shown_answer="Y"
-          else
-            shown_answer="N"
-          fi
           printf "\033[1A\r\033[2K" >&2
-          printf "%s: %b%s%b\n" "$prompt" "$color_selected" "$shown_answer" "$color_reset" >&2
+          printf "%s: %b%s%b\n" "$prompt" "$color_selected" "$answer" "$color_reset" >&2
         fi
         printf '%s\n' "$answer"
         return 0
         ;;
       *)
-        echo "Invalid input. Please enter exactly 'Y' or 'n' (or press Enter for default)."
+        echo "Invalid input. Please enter 'y' or 'n' (case-insensitive), or press Enter for default."
         ;;
     esac
   done
@@ -304,9 +293,9 @@ mirror_config_hf() {
     echo "Current HF_ENDPOINT: ${HF_ENDPOINT}"
   fi
 
-  use_hf_mirror="$(confirmer "${backbone_tip} may download weights from Hugging Face. Use mirror (https://hf-mirror.com)?" "yes")"
+  use_hf_mirror="$(confirmer "${backbone_tip} may download weights from Hugging Face. Use mirror (https://hf-mirror.com)?" "y")"
   case "$use_hf_mirror" in
-    Y)
+    y)
       export HF_ENDPOINT="https://hf-mirror.com"
       HF_MIRROR_STATUS="enabled"
       echo "Using mirror endpoint: ${HF_ENDPOINT}"
@@ -336,9 +325,9 @@ mirror_config_ibn() {
     return 0
   fi
 
-  use_mirror_confirm="$(confirmer "Use mirror URL for IBN checkpoint download?" "yes")"
+  use_mirror_confirm="$(confirmer "Use mirror URL for IBN checkpoint download?" "y")"
   case "$use_mirror_confirm" in
-    Y)
+    y)
       IBN_DOWNLOAD_SOURCE="mirror"
       IBN_MIRROR_STATUS="enabled"
       ;;
@@ -524,7 +513,7 @@ inputer stride "stride" "$default_stride" '^[1-9][0-9]*$' "" "Invalid stride: pl
 
 erasing_p="0"
 inputer erasing_p "erasing_p" "0" '^([0-9]+([.][0-9]+)?|[.][0-9]+)$' "v >= 0 && v <= 1" "Invalid erasing_p: please enter a number in [0, 1]."
-color_jitter="$(confirmer "Enable color_jitter?" "no")"
+color_jitter="$(confirmer "Enable color_jitter?" "n")"
 
 default_batchsize="32"
 default_lr="0.05"
@@ -566,9 +555,9 @@ echo "run_name      : $run_name"
 echo "hf_mirror     : $HF_MIRROR_STATUS"
 echo "ibn_mirror    : $IBN_MIRROR_STATUS"
 echo "----------------------------------------"
-confirm_run="$(confirmer "Confirm and start train+evaluate workflow?" "yes")"
+confirm_run="$(confirmer "Confirm and start train+evaluate workflow?" "y")"
 case "$confirm_run" in
-  Y)
+  y)
     ;;
   n)
     echo "Canceled."
@@ -585,7 +574,7 @@ ensure_ibn_checkpoint "$backbone"
 train_cmd=(python train.py --gpu_ids "$gpu_ids" --name "$run_name" --data_dir "$data_dir" --run_id "$run_id")
 train_cmd+=(--train_all)
 train_cmd+=(--erasing_p "$erasing_p")
-if [[ "$color_jitter" == "Y" ]]; then
+if [[ "$color_jitter" == "y" ]]; then
   train_cmd+=(--color_jitter)
 fi
 train_cmd+=(--warm_epoch "$warm_epoch")

@@ -116,33 +116,28 @@ confirmer() {
   local default_choice="$2"
   local answer
   local prompt_suffix=""
-  local default_answer=""
 
   case "$default_choice" in
-    yes)
-      prompt_suffix="[Y/n]"
-      default_answer="Y"
-      ;;
-    no)
-      prompt_suffix="[y/N]"
-      default_answer="n"
+    y|n)
+      prompt_suffix="[y/n] (default: ${default_choice})"
       ;;
     *)
-      echo "Invalid default option for confirmer: ${default_choice} (expected yes or no)."
+      echo "Invalid default option for confirmer: ${default_choice} (expected y or n)."
       return 1
       ;;
   esac
 
   while true; do
     read -r -p "${prompt} ${prompt_suffix}: " answer
-    answer="${answer:-$default_answer}"
+    answer="${answer:-$default_choice}"
+    answer="${answer,,}"
     case "$answer" in
-      Y|n)
+      y|n)
         printf '%s\n' "$answer"
         return 0
         ;;
       *)
-        echo "Invalid input. Please enter exactly 'Y' or 'n' (or press Enter for default)."
+        echo "Invalid input. Please enter 'y' or 'n' (case-insensitive), or press Enter for default."
         ;;
     esac
   done
@@ -369,9 +364,9 @@ echo "eval_dataset   : ${eval_dataset_name}"
 echo "eval_mode      : ${eval_mode}"
 echo "----------------------------------------"
 
-confirm_run="$(confirmer "Confirm and start test+evaluation workflow?" "yes")"
+confirm_run="$(confirmer "Confirm and start test+evaluation workflow?" "y")"
 case "$confirm_run" in
-  Y) ;;
+  y) ;;
   n)
     echo "Canceled."
     exit 0

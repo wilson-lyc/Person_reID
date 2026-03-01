@@ -74,10 +74,8 @@ confirmer() {
   local default_choice="$2"
   local answer
   local prompt_suffix=""
-  local default_answer=""
   local color_selected=""
   local color_reset=""
-  local shown_answer=""
 
   if [[ -t 2 ]]; then
     color_selected="\033[1;36m"
@@ -85,46 +83,32 @@ confirmer() {
   fi
 
   case "$default_choice" in
-    yes)
-      prompt_suffix="[Y/n]"
-      default_answer="Y"
-      ;;
-    no)
-      prompt_suffix="[y/N]"
-      default_answer="n"
+    y|n)
+      prompt_suffix="[y/n] (default: ${default_choice})"
       ;;
     *)
-      echo "Invalid default option for confirmer."
+      echo "Invalid default option for confirmer: ${default_choice} (expected y or n)."
       return 1
       ;;
   esac
 
   while true; do
     read -r -p "${prompt} ${prompt_suffix}: " answer
-    answer="${answer:-$default_answer}"
+    answer="${answer:-$default_choice}"
+    answer="${answer,,}"
     case "$answer" in
-      Y|n)
+      y|n)
         if [[ -t 2 ]]; then
-          if [[ "$answer" == "Y" ]]; then
-            shown_answer="Y"
-          else
-            shown_answer="N"
-          fi
           printf "\033[1A\r\033[2K" >&2
-          printf "%s: %b%s%b\n" "$prompt" "$color_selected" "$shown_answer" "$color_reset" >&2
+          printf "%s: %b%s%b\n" "$prompt" "$color_selected" "$answer" "$color_reset" >&2
         else
-          if [[ "$answer" == "Y" ]]; then
-            shown_answer="Y"
-          else
-            shown_answer="N"
-          fi
-          printf "%s: %s\n" "$prompt" "$shown_answer" >&2
+          printf "%s: %s\n" "$prompt" "$answer" >&2
         fi
         printf '%s\n' "$answer"
         return 0
         ;;
       *)
-        echo "Invalid input. Please enter exactly 'Y' or 'n' (or press Enter for default)."
+        echo "Invalid input. Please enter 'y' or 'n' (case-insensitive), or press Enter for default."
         ;;
     esac
   done
@@ -160,10 +144,10 @@ case "$backbone_choice" in
     ;;
 esac
 
-use_hf_mirror="$(confirmer "Use Hugging Face mirror (https://hf-mirror.com)?" "yes")"
+use_hf_mirror="$(confirmer "Use Hugging Face mirror (https://hf-mirror.com)?" "y")"
 
 cmd=(python load_hf_models.py "${backbone_flags[@]}")
-if [[ "$use_hf_mirror" == "Y" ]]; then
+if [[ "$use_hf_mirror" == "y" ]]; then
   export HF_ENDPOINT="https://hf-mirror.com"
   echo "Pulling model weights from Hugging Face via mirror: ${HF_ENDPOINT} ..."
 else
