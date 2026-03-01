@@ -151,8 +151,8 @@ selector() {
   printf -v "$__outvar" '%s' "$selected_value"
 
   if [[ -t 0 && -t 1 && (( rendered_once == 1 )) ]]; then
-    printf "\033[%dA" "$rendered_lines"
-    printf "\033[J"
+    # Remove only selector-rendered block, keep previous terminal output.
+    printf "\r\033[%dA\033[J" "$rendered_lines"
   fi
   printf "%s: %b%s%b\n" "$question" "$color_value" "$selected_value" "$color_reset"
   return 0
