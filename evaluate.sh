@@ -21,13 +21,6 @@ EOF
   echo "============================================================"
 }
 
-print_project_info() {
-  echo "Designed by Wilson | Implemented by Codex"
-  echo "Script: $(basename "$0")"
-  echo "Project codebase: https://github.com/layumi/Person_reID_baseline_pytorch"
-  echo
-}
-
 select_menu() {
   local __outvar="$1"
   local title="$2"
@@ -227,7 +220,6 @@ build_model_candidates() {
   local model_name=""
   local opts_file=""
   local has_weight=0
-  local has_last=0
 
   MODEL_NAMES=()
   MODEL_DESCS=()
@@ -241,11 +233,9 @@ build_model_candidates() {
     model_name="$(basename "$model_dir")"
     opts_file="${model_dir}/opts.yaml"
     has_weight=0
-    has_last=0
 
     [[ -f "$opts_file" ]] || continue
     if [[ -f "${model_dir}/net_last.pth" ]]; then
-      has_last=1
       has_weight=1
     elif compgen -G "${model_dir}/net_*.pth" > /dev/null; then
       has_weight=1
@@ -253,28 +243,8 @@ build_model_candidates() {
 
     [[ "$has_weight" -eq 1 ]] || continue
 
-    local mtime
-    if mtime="$(python - "$model_dir" <<'PY'
-import datetime
-import os
-import sys
-
-p = sys.argv[1]
-ts = os.path.getmtime(p)
-print(datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S"))
-PY
-)"; then
-      :
-    else
-      mtime="unknown-time"
-    fi
-
     MODEL_NAMES+=("$model_name")
-    if [[ "$has_last" -eq 1 ]]; then
-      MODEL_DESCS+=("${model_name}  [mtime: ${mtime}] [net_last]")
-    else
-      MODEL_DESCS+=("${model_name}  [mtime: ${mtime}] [no net_last]")
-    fi
+    MODEL_DESCS+=("${model_name}")
   done
 
   [[ ${#MODEL_NAMES[@]} -gt 0 ]]
@@ -282,7 +252,6 @@ PY
 
 clear
 print_banner
-print_project_info
 
 echo "Scanning trained models under ./model ..."
 MODEL_NAMES=()
@@ -302,14 +271,45 @@ model_path="./model/${name}"
 
 opts_file="${model_path}/opts.yaml"
 default_test_dir="./data/Market/pytorch"
+default_dataset_choice="1"
 if parsed_test_dir="$(extract_data_dir_from_opts "$opts_file")"; then
   default_test_dir="$parsed_test_dir"
   echo "Detected test_dir from opts.yaml: ${default_test_dir}"
-else
-  echo "Could not parse data_dir from ${opts_file}."
-  echo "Fallback default test_dir: ${default_test_dir}"
 fi
-inputer test_dir "test_dir" "$default_test_dir"
+
+case "$default_test_dir" in
+  "./data/Market/pytorch") default_dataset_choice="1" ;;
+  "./data/Duke/pytorch") default_dataset_choice="2" ;;
+  "./data/MSMT/pytorch") default_dataset_choice="3" ;;
+  "./data/CUB/pytorch") default_dataset_choice="4" ;;
+  "./data/VehicleID/pytorch") default_dataset_choice="5" ;;
+  "./data/VeRi/pytorch") default_dataset_choice="6" ;;
+  "./data/VIPeR/pytorch") default_dataset_choice="7" ;;
+  *) default_dataset_choice="1" ;;
+esac
+
+select_menu dataset_choice "Select Dataset:" "$default_dataset_choice" \
+  "Market-1501 (default)" \
+  "DukeMTMC-reID" \
+  "MSMT17" \
+  "CUB-200-2011" \
+  "VehicleID" \
+  "VeRi" \
+  "VIPeR"
+
+case "$dataset_choice" in
+  1) test_dir="./data/Market/pytorch" ;;
+  2) test_dir="./data/Duke/pytorch" ;;
+  3) test_dir="./data/MSMT/pytorch" ;;
+  4) test_dir="./data/CUB/pytorch" ;;
+  5) test_dir="./data/VehicleID/pytorch" ;;
+  6) test_dir="./data/VeRi/pytorch" ;;
+  7) test_dir="./data/VIPeR/pytorch" ;;
+  *)
+    echo "Invalid dataset number: $dataset_choice"
+    exit 1
+    ;;
+esac
 
 if ! validate_test_dir "$test_dir"; then
   echo "Invalid test_dir: ${test_dir}"
@@ -366,12 +366,7 @@ esac
 
 echo "----------------------------------------"
 echo "model_name     : ${name}"
-echo "model_path     : ${model_path}"
-echo "which_epoch    : ${resolved_which_epoch}"
-echo "test_dir       : ${test_dir}"
-echo "gpu_ids        : ${gpu_ids}"
 echo "eval_mode      : ${eval_mode}"
-echo "eval_script    : ${eval_script}"
 echo "----------------------------------------"
 
 confirm_run="$(confirmer "Confirm and start test+evaluation workflow?" "yes")"
