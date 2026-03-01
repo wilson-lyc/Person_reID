@@ -21,7 +21,6 @@ from torch.optim import swa_utils
 from tqdm import tqdm
 from model import ft_net, ft_net_dense, ft_net_hr, ft_net_swin, ft_net_swinv2, ft_net_dino, ft_net_efficient, ft_net_NAS, ft_net_convnext, PCB, PCB_test
 from utils import fuse_all_conv_bn
-from console_logger import build_prefixed_logger
 from tool.lark import lark_notify, lark_log
 version =  torch.__version__
 
@@ -50,8 +49,7 @@ parser.add_argument('--skip_eval', action='store_true', help='skip evaluate_gpu.
 
 opt = parser.parse_args()
 run_id = opt.run_id
-log = build_prefixed_logger("test", color="cyan")
-log(f"name={opt.name}")
+print(f"name={opt.name}")
 
 
 def format_duration(seconds):
@@ -217,7 +215,7 @@ def load_network(network):
             network = swa_utils.AveragedModel(network)
             network.load_state_dict(torch.load(save_path))
         if 'average' in opt.which_epoch:
-            log("we average %d snapshots" % network.n_averaged)
+            print("we average %d snapshots" % network.n_averaged)
             #swa_utils.update_bn(dataloaders['query'], network, device='cuda:0')
             network = network.module
     return network
@@ -321,7 +319,7 @@ if opt.multi:
 
 ######################################################################
 # Load trained model
-log("building model...")
+print("building model...")
 if opt.use_dense:
     model_structure = ft_net_dense(opt.nclasses, stride = opt.stride, linear_num=opt.linear_num)
 elif opt.use_NAS:
@@ -369,7 +367,7 @@ if use_gpu:
     model = model.cuda()
 
 
-log("fuse conv+bn for faster inference")
+print("fuse conv+bn for faster inference")
 model = fuse_all_conv_bn(model)
 
 # We can optionally trace the forward method with PyTorch JIT so it runs faster.
@@ -379,7 +377,7 @@ model = fuse_all_conv_bn(model)
 #dummy_forward_input = torch.rand(opt.batchsize, 3, h, w).cuda()
 #model = torch.jit.trace(model, dummy_forward_input)
 
-log(f"model ready: {model.__class__.__name__}")
+print(f"model ready: {model.__class__.__name__}")
 # Extract feature
 since = time.time()
 with torch.no_grad():
@@ -388,21 +386,21 @@ with torch.no_grad():
     if opt.multi:
         mquery_feature = extract_feature(model, dataloaders['multi-query'], "extract multi-query")
 time_elapsed = time.time() - since
-log(f"feature extraction complete in {format_duration(time_elapsed)}")
+print(f"feature extraction complete in {format_duration(time_elapsed)}")
 # Save to Matlab for check
 result = {'gallery_f':gallery_feature.numpy(),'gallery_label':gallery_label,'gallery_cam':gallery_cam,'query_f':query_feature.numpy(),'query_label':query_label,'query_cam':query_cam}
 scipy.io.savemat('pytorch_result.mat',result)
 
-log(f"run={opt.name}")
+print(f"run={opt.name}")
 result = './model/%s/result.txt'%opt.name
 eval_cmd = 'python evaluate_gpu.py | tee -a %s'%result
 eval_return_code = 0
 if opt.skip_eval:
-    log("skip evaluation (--skip_eval)")
+    print("skip evaluation (--skip_eval)")
 else:
-    log("evaluating metrics...")
+    print("evaluating metrics...")
     eval_return_code = os.system(eval_cmd)
-log(
+print(
     f"done | elapsed={format_duration(time_elapsed)} | "
     f"result_mat=pytorch_result.mat | result_txt={result} | "
     f"eval_skipped={bool(opt.skip_eval)} | evaluate_return={eval_return_code}"

@@ -27,7 +27,6 @@ from circle_loss import CircleLoss, convert_label_to_similarity
 from instance_loss import InstanceLoss
 from ODFA import ODFA
 from utils import save_network
-from console_logger import build_prefixed_logger
 from tool.lark import lark_notify, lark_log
 version =  torch.__version__
 from pytorch_metric_learning import losses, miners #pip install pytorch-metric-learning
@@ -87,8 +86,7 @@ parser.add_argument('--aiter', default=10, type=float, help='enable adversarial 
 
 opt = parser.parse_args()
 run_id = opt.run_id
-log = build_prefixed_logger("train", color="green")
-log(f"name={opt.name}")
+print(f"name={opt.name}")
 
 if opt.DG:
     opt.wa = True #DG will enable swa.
@@ -330,13 +328,13 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
     for epoch in range(num_epochs):
         epoch_start = time.time()
         epoch_stats = {}
-        log(f"epoch {epoch + 1}/{num_epochs}")
+        print(f"epoch {epoch + 1}/{num_epochs}")
 
         if opt.wa and wa_flag and epoch >=  num_epochs*0.8:
             wa_flag = False
             swa_model = swa_utils.AveragedModel(model)
             swa_model.avg_fn = swa_utils.get_ema_avg_fn(decay=0.996)
-            log("start weight avg")
+            print("start weight avg")
         
         # Each epoch has a training and validation phase
         for phase in ['train', 'val']:
@@ -347,8 +345,8 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
 
             # Keep batch feedback in tqdm; use compact epoch summary after each epoch.
             pbar = tqdm(
-                total=len(dataloaders[phase].dataset),
-                desc=f"{phase:<5}",
+                total=len(dataloaders[phase]),
+                desc=phase,
                 leave=True,
             )
             ordered_dict = collections.OrderedDict(Loss="", Acc="")
@@ -360,7 +358,7 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
                 # get the inputs
                 inputs, labels = data
                 now_batch_size,c,h,w = inputs.shape
-                pbar.update(now_batch_size)  # update the pbar even in the last batch
+                pbar.update(1)
                 if now_batch_size<opt.batchsize: # skip the last batch
                     continue
                 #print(inputs.shape)
@@ -548,7 +546,7 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
         current_lr = optimizer.param_groups[0]['lr']
         train_stat = epoch_stats.get('train', {})
         val_stat = epoch_stats.get('val', {})
-        log(
+        print(
             f"elapsed={format_duration(epoch_elapsed)} | "
             f"lr={current_lr:.6f} | "
             f"train_loss={train_stat.get('loss', 0.0):.4f} train_acc={train_stat.get('acc', 0.0):.4f} | "
@@ -586,7 +584,7 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
             )
 
     time_elapsed = time.time() - since
-    log(f"training complete in {format_duration(time_elapsed)}")
+    print(f"training complete in {format_duration(time_elapsed)}")
     #print('Best val Acc: {:4f}'.format(best_acc)
 
     # load best model weights
