@@ -271,6 +271,12 @@ mirror_config_hf() {
     convnext)
       backbone_tip="ConvNeXt"
       ;;
+    swin)
+      backbone_tip="Swin"
+      ;;
+    swinv2)
+      backbone_tip="SwinV2"
+      ;;
     *)
       HF_MIRROR_STATUS="N/A"
       return 0

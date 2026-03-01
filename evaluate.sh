@@ -4,23 +4,24 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Copyright:
-# Script built by Wilson: https://github.com/wilson-lyc
-# Co-developed with Codex (OpenAI)
-# Project codebase: https://github.com/layumi/Person_reID_baseline_pytorch
-
 print_banner() {
 cat <<'EOF'
-██████╗ ███████╗██████╗ ███████╗ ██████╗ ███╗   ██╗    ███████╗██╗   ██╗ █████╗ ██╗
-██╔══██╗██╔════╝██╔══██╗██╔════╝██╔═══██╗████╗  ██║    ██╔════╝██║   ██║██╔══██╗██║
-██████╔╝█████╗  ██████╔╝███████╗██║   ██║██╔██╗ ██║    █████╗  ██║   ██║███████║██║
-██╔═══╝ ██╔══╝  ██╔══██╗╚════██║██║   ██║██║╚██╗██║    ██╔══╝  ╚██╗ ██╔╝██╔══██║██║
-██║     ███████╗██║  ██║███████║╚██████╔╝██║ ╚████║    ███████╗ ╚████╔╝ ██║  ██║███████╗
-╚═╝     ╚══════╝╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═╝  ╚═══╝    ╚══════╝  ╚═══╝  ╚═╝  ╚═╝╚══════╝
+██████╗ ███████╗██████╗ ███████╗ ██████╗ ███╗   ██╗    ██████╗ ███████╗██╗██████╗
+██╔══██╗██╔════╝██╔══██╗██╔════╝██╔═══██╗████╗  ██║    ██╔══██╗██╔════╝██║██╔══██╗
+██████╔╝█████╗  ██████╔╝███████╗██║   ██║██╔██╗ ██║    ██████╔╝█████╗  ██║██║  ██║
+██╔═══╝ ██╔══╝  ██╔══██╗╚════██║██║   ██║██║╚██╗██║    ██╔══██╗██╔══╝  ██║██║  ██║
+██║     ███████╗██║  ██║███████║╚██████╔╝██║ ╚████║    ██║  ██║███████╗██║██████╔╝
+╚═╝     ╚══════╝╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═╝  ╚═══╝    ╚═╝  ╚═╝╚══════╝╚═╝╚═════╝
 EOF
 }
 
-select_option_by_number() {
+print_project_info() {
+  echo "Script by Wilson: https://github.com/wilson-lyc"
+  echo "Project codebase: https://github.com/layumi/Person_reID_baseline_pytorch"
+  echo
+}
+
+select_menu() {
   local __outvar="$1"
   local title="$2"
   local default_choice="$3"
@@ -30,6 +31,13 @@ select_option_by_number() {
   local selected_idx=0
   local selected_text=""
   local input_prompt="Enter choice [${default_choice}]: "
+  local color_selected=""
+  local color_reset=""
+
+  if [[ -t 1 ]]; then
+    color_selected="\033[1;36m"
+    color_reset="\033[0m"
+  fi
 
   echo "$title"
   for i in "${!options[@]}"; do
@@ -54,393 +62,345 @@ select_option_by_number() {
     printf "\033[%dA" "$(( ${#options[@]} + 2 ))"
     printf "\033[J"
   fi
-  echo "${title} ${selected_text}"
+  printf "%s %b%s%b\n" "$title" "$color_selected" "$selected_text" "$color_reset"
   printf -v "$__outvar" '%s' "$choice"
 }
 
-dataset_display_name() {
-  local ds_name="$1"
-  case "$ds_name" in
-    market) echo "Market-1501" ;;
-    duke) echo "DukeMTMC-reID" ;;
-    msmt17) echo "MSMT17" ;;
-    cub) echo "CUB-200-2011" ;;
-    vehicleid) echo "VehicleID" ;;
-    veri) echo "VeRi" ;;
-    viper) echo "VIPeR" ;;
-    *) echo "$ds_name" ;;
-  esac
-}
+inputer() {
+  local __outvar="$1"
+  local label="$2"
+  local default_value="$3"
+  local regex="${4:-}"
+  local range_expr="${5:-}"
+  local err_msg="${6:-Invalid input.}"
+  local value=""
+  local ok=1
+  local color_selected=""
+  local color_reset=""
 
-print_manual_dataset_tutorial() {
-  local ds_name="$1"
-  local raw_dir="$2"
-  local prepared_dir="$3"
-  local prepare_script="$4"
-  local ds_display
-  ds_display="$(dataset_display_name "$ds_name")"
-
-  echo
-  echo "================ MANUAL DATASET PREPARATION GUIDE ================"
-  echo "[Dataset] ${ds_display} (${ds_name})"
-  echo "Raw path should be: ${raw_dir}"
-  echo "Run prepare command:"
-  echo "  python ${prepare_script} --path \"${raw_dir}\""
-  echo "Expected prepared path:"
-  echo "  ${prepared_dir}"
-  echo "If evaluation still fails, please check folder structure under:"
-  echo "  ${prepared_dir}"
-  echo "=================================================================="
-  echo
-}
-
-dataset_has_required_structure() {
-  local path="$1"
-  [[ -d "${path}/query" && -d "${path}/bounding_box_train" && -d "${path}/bounding_box_test" ]]
-}
-
-try_auto_download_dataset() {
-  local ds_name="$1"
-  local raw_dir="$2"
-  local file_id=""
-  local archive_name=""
-
-  case "$ds_name" in
-    market)
-      file_id="0B8-rUzbwVRk0c054eEozWG9COHM"
-      archive_name="Market-1501-v15.09.15.zip"
-      ;;
-    duke)
-      file_id="1jjE85dRCMOgRtvJ5RQV9-Afs-2_5dY3O"
-      archive_name="DukeMTMC-reID.zip"
-      ;;
-    *)
-      return 1
-      ;;
-  esac
-
-  local parent_dir
-  parent_dir="$(dirname "$raw_dir")"
-  local archive_path="${parent_dir}/${archive_name}"
-  local tmp_extract_dir="${parent_dir}/.tmp_extract_${ds_name}"
-
-  echo "Dataset missing. Trying Google Drive auto-download for $(dataset_display_name "$ds_name") (${ds_name}) ..."
-  mkdir -p "$parent_dir"
-
-  echo "Installing gdown (if needed) ..."
-  if ! python -m pip install gdown; then
-    echo "Auto-download failed: unable to install gdown."
-    return 2
+  if [[ -t 1 ]]; then
+    color_selected="\033[1;36m"
+    color_reset="\033[0m"
   fi
 
-  echo "Downloading archive to ${archive_path} ..."
-  if ! python -m gdown --id "$file_id" --output "$archive_path"; then
-    echo "Auto-download failed: cannot access Google Drive or download was blocked."
-    return 2
-  fi
+  while true; do
+    read -r -p "${label} [${default_value}]: " value
+    value="${value:-$default_value}"
+    ok=1
 
-  echo "Extracting and normalizing dataset layout ..."
-  if ! python - "$raw_dir" "$archive_path" "$tmp_extract_dir" <<'PY'
-import shutil
-import sys
-import tarfile
-import zipfile
-from pathlib import Path
-
-raw_dir = Path(sys.argv[1]).resolve()
-archive_path = Path(sys.argv[2]).resolve()
-tmp_extract_dir = Path(sys.argv[3]).resolve()
-
-required = {"query", "bounding_box_train", "bounding_box_test"}
-
-if tmp_extract_dir.exists():
-    shutil.rmtree(tmp_extract_dir)
-tmp_extract_dir.mkdir(parents=True, exist_ok=True)
-
-if archive_path.suffix.lower() == ".zip":
-    with zipfile.ZipFile(archive_path, "r") as zf:
-        zf.extractall(tmp_extract_dir)
-elif archive_path.suffix.lower() in {".tar", ".gz", ".tgz", ".bz2", ".xz"}:
-    with tarfile.open(archive_path, "r:*") as tf:
-        tf.extractall(tmp_extract_dir)
-else:
-    raise RuntimeError(f"Unsupported archive format: {archive_path}")
-
-def is_raw_root(path: Path) -> bool:
-    if not path.is_dir():
-        return False
-    names = {p.name for p in path.iterdir() if p.is_dir()}
-    return required.issubset(names)
-
-candidate = None
-if is_raw_root(tmp_extract_dir):
-    candidate = tmp_extract_dir
-else:
-    for p in tmp_extract_dir.rglob("*"):
-        if is_raw_root(p):
-            candidate = p
-            break
-
-if candidate is None:
-    raise RuntimeError(
-        f"Failed to locate dataset root after extracting {archive_path}. "
-        f"Expected folders: {sorted(required)}"
-    )
-
-raw_dir.mkdir(parents=True, exist_ok=True)
-for item in candidate.iterdir():
-    dst = raw_dir / item.name
-    if dst.exists():
-        if dst.is_dir():
-            shutil.rmtree(dst)
-        else:
-            dst.unlink()
-    shutil.move(str(item), str(dst))
-
-shutil.rmtree(tmp_extract_dir, ignore_errors=True)
-print(f"Dataset prepared at: {raw_dir}")
-PY
-  then
-    echo "Auto-download failed: archive extraction/normalization error."
-    return 2
-  fi
-}
-
-ensure_dataset_ready() {
-  local ds_name="$1"
-  local raw_dir="$2"
-  local prepared_dir="$3"
-  local prepare_script="$4"
-
-  if ! dataset_has_required_structure "$raw_dir"; then
-    if [[ "$ds_name" == "market" || "$ds_name" == "duke" ]]; then
-      echo "Dataset path is missing or incomplete: ${raw_dir}"
-      read -r -p "Do you want to auto-download ${ds_name} from Google Drive? [Y/n]: " auto_download_confirm
-      auto_download_confirm="${auto_download_confirm:-Y}"
-      case "$auto_download_confirm" in
-        Y|y|yes|YES)
-          if ! try_auto_download_dataset "$ds_name" "$raw_dir"; then
-            echo "Google Drive auto-download is unavailable for ${ds_name}."
-            echo "Please prepare dataset manually first, then rerun evaluate.sh."
-            print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir" "$prepare_script"
-            exit 1
-          fi
-          ;;
-        *)
-          echo "Auto-download canceled by user."
-          echo "Please prepare dataset manually first, then rerun evaluate.sh."
-          print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir" "$prepare_script"
-          exit 1
-          ;;
-      esac
-    else
-      echo "Dataset raw path not found or incomplete: ${raw_dir}"
-      print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir" "$prepare_script"
-      return 1
+    if [[ -n "$regex" ]] && [[ ! "$value" =~ $regex ]]; then
+      ok=0
     fi
+    if [[ $ok -eq 1 && -n "$range_expr" ]] && ! awk -v v="$value" "BEGIN {exit !($range_expr)}"; then
+      ok=0
+    fi
+
+    if [[ $ok -eq 1 ]]; then
+      break
+    fi
+    echo "$err_msg"
+  done
+
+  if [[ -t 1 ]]; then
+    printf "\033[1A\r\033[2K"
+    printf "%s: %b%s%b\n" "$label" "$color_selected" "$value" "$color_reset"
+  else
+    echo "${label}: ${value}"
   fi
 
-  if ! dataset_has_required_structure "$raw_dir"; then
-    echo "Dataset raw path is still incomplete after auto-download: ${raw_dir}"
-    print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir" "$prepare_script"
-    return 1
-  fi
-
-  echo "Preparing dataset by ${prepare_script} ..."
-  if ! python "$prepare_script" --path "$raw_dir"; then
-    echo "Prepare failed."
-    print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir" "$prepare_script"
-    return 1
-  fi
-
-  if [[ ! -d "$prepared_dir" ]]; then
-    echo "Prepared path not found after prepare: ${prepared_dir}"
-    print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir" "$prepare_script"
-    return 1
-  fi
-
-  return 0
+  printf -v "$__outvar" '%s' "$value"
 }
 
-resolve_dataset_config() {
-  local choice="$1"
-  case "$choice" in
-    1) selected_dataset="market";    selected_raw_data_dir="./data/Market";    selected_prepare_script="prepare.py" ;;
-    2) selected_dataset="duke";      selected_raw_data_dir="./data/Duke";      selected_prepare_script="prepare_Duke.py" ;;
-    3) selected_dataset="msmt17";    selected_raw_data_dir="./data/MSMT17";    selected_prepare_script="prepare_MSMT.py" ;;
-    4) selected_dataset="cub";       selected_raw_data_dir="./data/CUB";       selected_prepare_script="prepare_CUB.py" ;;
-    5) selected_dataset="vehicleid"; selected_raw_data_dir="./data/VehicleID"; selected_prepare_script="prepare_VehicleID.py" ;;
-    6) selected_dataset="veri";      selected_raw_data_dir="./data/VeRi";      selected_prepare_script="prepare_VeRi.py" ;;
-    7) selected_dataset="viper";     selected_raw_data_dir="./data/VIPeR";     selected_prepare_script="prepare_viper.py" ;;
+confirmer() {
+  local prompt="$1"
+  local default_choice="$2"
+  local answer
+  local prompt_suffix=""
+  local default_answer=""
+
+  case "$default_choice" in
+    yes)
+      prompt_suffix="[Y/n]"
+      default_answer="Y"
+      ;;
+    no)
+      prompt_suffix="[y/N]"
+      default_answer="n"
+      ;;
     *)
-      echo "Invalid test dataset number: $choice"
-      exit 1
+      echo "Invalid default option for confirmer: ${default_choice} (expected yes or no)."
+      return 1
       ;;
   esac
+
+  while true; do
+    read -r -p "${prompt} ${prompt_suffix}: " answer
+    answer="${answer:-$default_answer}"
+    case "$answer" in
+      Y|n)
+        printf '%s\n' "$answer"
+        return 0
+        ;;
+      *)
+        echo "Invalid input. Please enter exactly 'Y' or 'n' (or press Enter for default)."
+        ;;
+    esac
+  done
 }
 
-configure_hf_endpoint_for_model() {
-  local run_name="$1"
-  local config_path="./model/${run_name}/opts.yaml"
-  if [[ ! -f "$config_path" ]]; then
-    return 0
+extract_data_dir_from_opts() {
+  local opts_file="$1"
+  local parsed=""
+  if [[ ! -f "$opts_file" ]]; then
+    return 1
   fi
 
-  if ! python - "$config_path" <<'PY'
+  if parsed="$(python - "$opts_file" <<'PY'
 import sys
 import yaml
 
-path = sys.argv[1]
-with open(path, "r", encoding="utf-8") as f:
-    cfg = yaml.load(f, Loader=yaml.FullLoader)
-use_hr = bool(cfg.get("use_hr", False))
-sys.exit(0 if use_hr else 1)
-PY
-  then
-    return 0
-  fi
-
-  if [[ -n "${HF_ENDPOINT:-}" ]]; then
-    echo "HRNet model detected. HF_ENDPOINT is already set to: ${HF_ENDPOINT}"
-    return 0
-  fi
-
-  echo "HRNet model detected. Checking direct access to Hugging Face..."
-  if python - <<'PY'
-import sys
-import urllib.request
-
-url = "https://huggingface.co"
+opts_file = sys.argv[1]
 try:
-    with urllib.request.urlopen(url, timeout=5) as resp:
-        status = getattr(resp, "status", 200)
-    sys.exit(0 if 200 <= status < 500 else 1)
+    with open(opts_file, "r", encoding="utf-8") as f:
+        cfg = yaml.load(f, Loader=yaml.FullLoader)
+    data_dir = cfg.get("data_dir", "")
+    if isinstance(data_dir, str):
+        print(data_dir.strip())
 except Exception:
-    sys.exit(1)
+    pass
 PY
-  then
-    echo "Hugging Face is reachable. Using direct endpoint."
-  else
-    export HF_ENDPOINT="https://hf-mirror.com"
-    echo "Hugging Face is unreachable. Fallback to mirror: ${HF_ENDPOINT}"
+)"; then
+    if [[ -n "$parsed" ]]; then
+      printf '%s\n' "$parsed"
+      return 0
+    fi
   fi
+  return 1
+}
+
+list_available_epochs() {
+  local model_path="$1"
+  local epochs=()
+  local f=""
+  for f in "${model_path}"/net_*.pth; do
+    [[ -e "$f" ]] || continue
+    local bn
+    bn="$(basename "$f")"
+    if [[ "$bn" =~ ^net_([0-9]+)\.pth$ ]]; then
+      epochs+=("${BASH_REMATCH[1]}")
+    fi
+  done
+  if [[ ${#epochs[@]} -eq 0 ]]; then
+    return 1
+  fi
+  printf '%s\n' "${epochs[@]}" | sort -u
+}
+
+validate_epoch_exists() {
+  local model_path="$1"
+  local epoch="$2"
+  if [[ "$epoch" == "last" ]]; then
+    [[ -f "${model_path}/net_last.pth" ]]
+    return
+  fi
+  [[ "$epoch" =~ ^[0-9]+$ ]] || return 1
+  local padded
+  padded="$(printf "%03d" "$epoch")"
+  [[ -f "${model_path}/net_${padded}.pth" || -f "${model_path}/net_${epoch}.pth" ]]
+}
+
+validate_test_dir() {
+  local test_dir="$1"
+  [[ -d "$test_dir/query" && -d "$test_dir/gallery" ]]
+}
+
+build_model_candidates() {
+  local model_root="./model"
+  local model_dir=""
+  local model_name=""
+  local opts_file=""
+  local has_weight=0
+  local has_last=0
+
+  MODEL_NAMES=()
+  MODEL_DESCS=()
+
+  if [[ ! -d "$model_root" ]]; then
+    return 1
+  fi
+
+  for model_dir in "$model_root"/*; do
+    [[ -d "$model_dir" ]] || continue
+    model_name="$(basename "$model_dir")"
+    opts_file="${model_dir}/opts.yaml"
+    has_weight=0
+    has_last=0
+
+    [[ -f "$opts_file" ]] || continue
+    if [[ -f "${model_dir}/net_last.pth" ]]; then
+      has_last=1
+      has_weight=1
+    elif compgen -G "${model_dir}/net_*.pth" > /dev/null; then
+      has_weight=1
+    fi
+
+    [[ "$has_weight" -eq 1 ]] || continue
+
+    local mtime
+    if mtime="$(python - "$model_dir" <<'PY'
+import datetime
+import os
+import sys
+
+p = sys.argv[1]
+ts = os.path.getmtime(p)
+print(datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S"))
+PY
+)"; then
+      :
+    else
+      mtime="unknown-time"
+    fi
+
+    MODEL_NAMES+=("$model_name")
+    if [[ "$has_last" -eq 1 ]]; then
+      MODEL_DESCS+=("${model_name}  [mtime: ${mtime}] [net_last]")
+    else
+      MODEL_DESCS+=("${model_name}  [mtime: ${mtime}] [no net_last]")
+    fi
+  done
+
+  [[ ${#MODEL_NAMES[@]} -gt 0 ]]
 }
 
 clear
 print_banner
-echo "Evaluate script for trained models"
-echo "Project codebase: https://github.com/layumi/Person_reID_baseline_pytorch"
-echo
+print_project_info
 
-run_name=""
-if [[ -d "./model" ]]; then
-  mapfile -t available_runs < <(find ./model -mindepth 2 -maxdepth 2 -type f -name opts.yaml | sed 's#^\./model/\(.*\)/opts.yaml#\1#' | sort)
-else
-  available_runs=()
-fi
-
-if [[ "${#available_runs[@]}" -gt 0 ]]; then
-  select_option_by_number run_choice "Select model to evaluate:" "1" "${available_runs[@]}"
-  run_name="${available_runs[$((run_choice - 1))]}"
-else
-  echo "No trained model with opts.yaml found under ./model."
-  read -r -p "Enter existing run name under ./model (required): " run_name
-  if [[ -z "$run_name" ]]; then
-    echo "run_name is required."
-    exit 1
-  fi
-fi
-
-config_path="./model/${run_name}/opts.yaml"
-if [[ ! -f "$config_path" ]]; then
-  echo "Missing training config: ${config_path}"
-  echo "Please ensure this run was trained successfully."
+echo "Scanning trained models under ./model ..."
+MODEL_NAMES=()
+MODEL_DESCS=()
+if ! build_model_candidates; then
+  echo "No valid trained models found in ./model."
+  echo "A valid model directory must contain opts.yaml and net_last.pth (or at least one net_*.pth)."
+  echo "Please train first, then rerun evaluate.sh."
   exit 1
 fi
 
-select_option_by_number test_dataset_choice "Select Test Dataset:" "1" \
-  "Market-1501" \
-  "DukeMTMC-reID" \
-  "MSMT17" \
-  "CUB-200-2011" \
-  "VehicleID" \
-  "VeRi" \
-  "VIPeR"
+default_model_idx="${#MODEL_NAMES[@]}"
+select_menu model_choice "Select Model:" "$default_model_idx" "${MODEL_DESCS[@]}"
+selected_index=$((model_choice - 1))
+name="${MODEL_NAMES[$selected_index]}"
+model_path="./model/${name}"
 
-resolve_dataset_config "$test_dataset_choice"
-test_dataset="$selected_dataset"
-test_dataset_display="$(dataset_display_name "$test_dataset")"
-test_raw_data_dir="$selected_raw_data_dir"
-test_prepare_script="$selected_prepare_script"
-test_dir="${test_raw_data_dir}/pytorch"
+opts_file="${model_path}/opts.yaml"
+default_test_dir="./data/Market/pytorch"
+if parsed_test_dir="$(extract_data_dir_from_opts "$opts_file")"; then
+  default_test_dir="$parsed_test_dir"
+  echo "Detected test_dir from opts.yaml: ${default_test_dir}"
+else
+  echo "Could not parse data_dir from ${opts_file}."
+  echo "Fallback default test_dir: ${default_test_dir}"
+fi
+inputer test_dir "test_dir" "$default_test_dir"
 
-gpu_ids="0"
-read -r -p "GPU ids [0]: " input_gpu_ids
-gpu_ids="${input_gpu_ids:-$gpu_ids}"
+if ! validate_test_dir "$test_dir"; then
+  echo "Invalid test_dir: ${test_dir}"
+  echo "Required folders are missing: ${test_dir}/query and ${test_dir}/gallery"
+  exit 1
+fi
 
-read -r -p "Which epoch for test [last]: " which_epoch
-which_epoch="${which_epoch:-last}"
+inputer gpu_ids "gpu_ids" "0"
 
-batchsize="256"
-read -r -p "Batch size [256]: " input_batchsize
-batchsize="${input_batchsize:-$batchsize}"
+default_epoch="last"
+if [[ ! -f "${model_path}/net_last.pth" ]]; then
+  if mapfile -t epochs < <(list_available_epochs "$model_path"); then
+    default_epoch="${epochs[${#epochs[@]}-1]}"
+    echo "net_last.pth not found. Defaulting which_epoch to latest numeric epoch: ${default_epoch}"
+  else
+    echo "No available model checkpoint found in ${model_path}."
+    exit 1
+  fi
+fi
+inputer which_epoch "which_epoch" "$default_epoch" '^(last|[0-9]+)$' "" "Invalid which_epoch: expected 'last' or a non-negative integer."
 
-ms="1"
-read -r -p "Multi-scale (ms) [1]: " input_ms
-ms="${input_ms:-$ms}"
+if ! validate_epoch_exists "$model_path" "$which_epoch"; then
+  echo "Checkpoint for which_epoch='${which_epoch}' not found under ${model_path}."
+  echo "Available checkpoints:"
+  if [[ -f "${model_path}/net_last.pth" ]]; then
+    echo "  - last"
+  fi
+  while IFS= read -r ep; do
+    echo "  - ${ep}"
+  done < <(list_available_epochs "$model_path" || true)
+  exit 1
+fi
 
-read -r -p "Use multi-query? [y/N]: " multi_query_confirm
-read -r -p "Skip evaluate_gpu.py and only extract features? [y/N]: " skip_eval_confirm
+resolved_which_epoch="$which_epoch"
+if [[ "$which_epoch" != "last" ]]; then
+  epoch_padded="$(printf "%03d" "$which_epoch")"
+  if [[ -f "${model_path}/net_${epoch_padded}.pth" && ! -f "${model_path}/net_${which_epoch}.pth" ]]; then
+    resolved_which_epoch="$epoch_padded"
+  fi
+fi
 
-run_id="$(python tool/run_id.py)"
+select_menu eval_mode_choice "Select Evaluation Mode:" "1" \
+  "Normal evaluation (evaluate_gpu.py)" \
+  "Re-ranking evaluation (evaluate_rerank.py)"
 
-test_cmd=(python test.py --gpu_ids "$gpu_ids" --name "$run_name" --test_dir "$test_dir" --which_epoch "$which_epoch" --batchsize "$batchsize" --ms "$ms" --run_id "$run_id")
-case "$multi_query_confirm" in
-  Y|y|yes|YES) test_cmd+=(--multi) ;;
-esac
-case "$skip_eval_confirm" in
-  Y|y|yes|YES) test_cmd+=(--skip_eval) ;;
-esac
-
-clear
-print_banner
-echo "Evaluate script for trained models"
-echo
-echo "----------------------------------------"
-echo "run_name      : $run_name"
-echo "config_path   : $config_path"
-echo "test_dataset  : $test_dataset_display ($test_dataset)"
-echo "test_prepare  : $test_prepare_script"
-echo "test_raw_dir  : $test_raw_data_dir"
-echo "test_dir      : $test_dir"
-echo "gpu_ids       : $gpu_ids"
-echo "which_epoch   : $which_epoch"
-echo "batchsize     : $batchsize"
-echo "ms            : $ms"
-echo "multi_query   : $multi_query_confirm"
-echo "skip_eval     : $skip_eval_confirm"
-echo "run_id        : $run_id"
-echo "----------------------------------------"
-read -r -p "Confirm and start evaluation? [Y/n]: " confirm_run
-confirm_run="${confirm_run:-Y}"
-case "$confirm_run" in
-  Y|y|yes|YES)
-    ;;
+case "$eval_mode_choice" in
+  1) eval_mode="normal"; eval_script="evaluate_gpu.py" ;;
+  2) eval_mode="rerank"; eval_script="evaluate_rerank.py" ;;
   *)
+    echo "Invalid evaluation mode: ${eval_mode_choice}"
+    exit 1
+    ;;
+esac
+
+echo "----------------------------------------"
+echo "model_name     : ${name}"
+echo "model_path     : ${model_path}"
+echo "which_epoch    : ${resolved_which_epoch}"
+echo "test_dir       : ${test_dir}"
+echo "gpu_ids        : ${gpu_ids}"
+echo "eval_mode      : ${eval_mode}"
+echo "eval_script    : ${eval_script}"
+echo "----------------------------------------"
+
+confirm_run="$(confirmer "Confirm and start test+evaluation workflow?" "yes")"
+case "$confirm_run" in
+  Y) ;;
+  n)
     echo "Canceled."
     exit 0
     ;;
 esac
 
-configure_hf_endpoint_for_model "$run_name"
+result_file="${model_path}/result.txt"
+timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
 
-echo "[1/2] Preparing test dataset..."
-ensure_dataset_ready "$test_dataset" "$test_raw_data_dir" "$test_dir" "$test_prepare_script"
+echo "[$timestamp] ==== evaluate.sh run start ====" >> "$result_file"
+echo "[$timestamp] model=${name}, which_epoch=${resolved_which_epoch}, test_dir=${test_dir}, gpu_ids=${gpu_ids}, mode=${eval_mode}" >> "$result_file"
 
-echo "[2/2] Evaluating..."
-"${test_cmd[@]}"
+echo "[1/2] Running test.py (feature extraction only)..."
+python test.py \
+  --gpu_ids "$gpu_ids" \
+  --name "$name" \
+  --test_dir "$test_dir" \
+  --which_epoch "$resolved_which_epoch" \
+  --skip_eval
 
-echo "Done. Artifacts:"
-echo "  model dir : ./model/${run_name}"
-echo "  result    : ./model/${run_name}/result.txt"
-echo "  run_id    : ${run_id}"
+if [[ ! -f "pytorch_result.mat" ]]; then
+  echo "test.py finished but pytorch_result.mat was not generated."
+  exit 1
+fi
+
+echo "[2/2] Running ${eval_script}..."
+python "$eval_script" | tee -a "$result_file"
+
+end_timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
+echo "[$end_timestamp] ==== evaluate.sh run end ====" >> "$result_file"
+echo
+echo "Done."
+echo "Result file     : ${result_file}"
+echo "Feature file    : ./pytorch_result.mat"
