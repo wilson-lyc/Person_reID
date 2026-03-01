@@ -349,7 +349,7 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
                 desc=phase,
                 leave=True,
             )
-            ordered_dict = collections.OrderedDict(phase="", Loss="", Acc="")
+            ordered_dict = collections.OrderedDict(Loss="", Acc="")
 
             running_loss = 0.0
             running_corrects = 0.0
@@ -506,7 +506,6 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
                 del loss
                 running_corrects += float(torch.sum(preds == labels.data))
                 # Refresh the progress bar in every batch
-                ordered_dict["phase"] = phase
                 ordered_dict[
                     "Acc"
                 ] = f"{(float(torch.sum(preds == labels.data)) / now_batch_size):.4f}"
@@ -517,7 +516,6 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
             
             # print('{} Loss: {:.4f} Acc: {:.4f}'.format(
             #     phase, epoch_loss, epoch_acc))
-            ordered_dict["phase"] = phase
             ordered_dict["Loss"] = f"{epoch_loss:.4f}"
             ordered_dict["Acc"] = f"{epoch_acc:.4f}"
             pbar.set_postfix(ordered_dict=ordered_dict)
