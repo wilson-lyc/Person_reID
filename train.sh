@@ -21,10 +21,17 @@ cat <<'EOF'
 ██║     ███████╗██║  ██║███████║╚██████╔╝██║ ╚████║    ██║  ██║███████╗██║██████╔╝
 ╚═╝     ╚══════╝╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═╝  ╚═══╝    ╚═╝  ╚═╝╚══════╝╚═╝╚═════╝
 EOF
+  local script_name
+  script_name="$(basename "$0")"
+  echo "+----------------------------------------------------------+"
+  echo "| Designed by Wilson | Implemented by Codex               |"
+  printf "| Script: %-48s |\n" "$script_name"
+  echo "+----------------------------------------------------------+"
 }
 
 print_project_info() {
-  echo "Script by Wilson: https://github.com/wilson-lyc"
+  echo "Designed by Wilson | Implemented by Codex"
+  echo "Script: $(basename "$0")"
   echo "Project codebase: https://github.com/layumi/Person_reID_baseline_pytorch"
   echo
 }
