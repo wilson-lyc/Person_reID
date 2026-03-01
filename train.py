@@ -330,6 +330,7 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
     for epoch in range(num_epochs):
         epoch_start = time.time()
         epoch_stats = {}
+        log(f"epoch {epoch + 1}/{num_epochs}")
 
         if opt.wa and wa_flag and epoch >=  num_epochs*0.8:
             wa_flag = False
@@ -347,7 +348,7 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
             # Keep batch feedback in tqdm; use compact epoch summary after each epoch.
             pbar = tqdm(
                 total=len(dataloaders[phase].dataset),
-                desc=f"{phase} ({epoch + 1}/{num_epochs})",
+                desc=f"{phase:<5}",
                 leave=True,
             )
             ordered_dict = collections.OrderedDict(Loss="", Acc="")
@@ -548,7 +549,7 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
         train_stat = epoch_stats.get('train', {})
         val_stat = epoch_stats.get('val', {})
         log(
-            f"Epoch [{epoch + 1}/{num_epochs}] | elapsed={format_duration(epoch_elapsed)} | "
+            f"elapsed={format_duration(epoch_elapsed)} | "
             f"lr={current_lr:.6f} | "
             f"train_loss={train_stat.get('loss', 0.0):.4f} train_acc={train_stat.get('acc', 0.0):.4f} | "
             f"val_loss={val_stat.get('loss', 0.0):.4f} val_acc={val_stat.get('acc', 0.0):.4f} | "
