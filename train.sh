@@ -502,6 +502,7 @@ inputer stride "stride" "$default_stride" '^[1-9][0-9]*$' "" "Invalid stride: pl
 
 erasing_p="0"
 inputer erasing_p "erasing_p" "0" '^([0-9]+([.][0-9]+)?|[.][0-9]+)$' "v >= 0 && v <= 1" "Invalid erasing_p: please enter a number in [0, 1]."
+color_jitter="$(confirmer "Enable color_jitter?" "no")"
 
 default_batchsize="32"
 default_lr="0.05"
@@ -536,6 +537,7 @@ echo "loss          : $loss_name"
 echo "warm_epoch    : $warm_epoch"
 echo "stride        : $stride"
 echo "erasing_p     : $erasing_p"
+echo "color_jitter  : $color_jitter"
 echo "batchsize     : $batchsize"
 echo "lr            : $lr"
 echo "run_name      : $run_name"
@@ -561,6 +563,9 @@ ensure_ibn_checkpoint "$backbone"
 train_cmd=(python train.py --gpu_ids "$gpu_ids" --name "$run_name" --data_dir "$data_dir" --run_id "$run_id")
 train_cmd+=(--train_all)
 train_cmd+=(--erasing_p "$erasing_p")
+if [[ "$color_jitter" == "Y" ]]; then
+  train_cmd+=(--color_jitter)
+fi
 train_cmd+=(--warm_epoch "$warm_epoch")
 train_cmd+=(--stride "$stride")
 train_cmd+=(--batchsize "$batchsize")
