@@ -113,7 +113,7 @@ confirmer() {
   done
 }
 
-# Parameter input with colored confirmation (similar to select_menu).
+# Parameter inputer
 inputer() {
   local __outvar="$1"
   local label="$2"
@@ -298,11 +298,16 @@ mirror_config_hf() {
   esac
 }
 
+is_ibn_backbone() {
+  local selected_backbone="$1"
+  [[ "$selected_backbone" == "resnet50_ibn" || "$selected_backbone" == "resnet_ibn" ]]
+}
+
 mirror_config_ibn() {
   local selected_backbone="$1"
   local use_mirror_confirm
 
-  if [[ "$selected_backbone" != "resnet50_ibn" ]]; then
+  if ! is_ibn_backbone "$selected_backbone"; then
     IBN_MIRROR_STATUS="N/A"
     IBN_DOWNLOAD_SOURCE="direct"
     return 0
@@ -323,7 +328,7 @@ mirror_config_ibn() {
 
 ensure_ibn_checkpoint() {
   local selected_backbone="$1"
-  if [[ "$selected_backbone" != "resnet50_ibn" ]]; then
+  if ! is_ibn_backbone "$selected_backbone"; then
     return 0
   fi
 
@@ -401,39 +406,39 @@ print_project_info
 
 # Backbone selection
 select_menu backbone_choice "Select Backbone:" "1" \
-  "ResNet50 (baseline, default)" \
-  "ResNet50-IBN" \
+  "ResNet50 (baseline)" \
+  "ResNet50 + IBN" \
+  "ResNet50 + PCB" \
+  "ResNet50 + USAM" \
   "DenseNet121" \
+  "HRNet" \
+  "ConvNeXt" \
   "Swin" \
   "SwinV2" \
   "DINOv3" \
   "EfficientNet-B4" \
   "NAS" \
-  "HRNet" \
-  "ConvNeXt" \
-  "PCB (ResNet50+PCB)" \
-  "ResNet50-USAM"
-
+  
 case "$backbone_choice" in
-  1) backbone="resnet50"; backbone_flags=() ;;
-  2) backbone="resnet50_ibn"; backbone_flags=(--ibn) ;;
-  3) backbone="densenet"; backbone_flags=(--use_dense) ;;
-  4) backbone="swin"; backbone_flags=(--use_swin) ;;
-  5) backbone="swinv2"; backbone_flags=(--use_swinv2) ;;
-  6) backbone="dino"; backbone_flags=(--use_dino) ;;
-  7) backbone="efficientnet_b4"; backbone_flags=(--use_efficient) ;;
-  8) backbone="nas"; backbone_flags=(--use_NAS) ;;
-  9) backbone="hrnet"; backbone_flags=(--use_hr) ;;
-  10) backbone="convnext"; backbone_flags=(--use_convnext) ;;
-  11) backbone="pcb"; backbone_flags=(--PCB) ;;
-  12) backbone="resnet50_usam"; backbone_flags=(--usam) ;;
+  1) backbone="resnet"; backbone_flags=() ;;
+  2) backbone="resnet_ibn"; backbone_flags=(--ibn) ;;
+  3) backbone="resnet_pcb"; backbone_flags=(--PCB) ;;
+  4) backbone="resnet_usam"; backbone_flags=(--usam) ;;
+  5) backbone="densenet"; backbone_flags=(--use_dense) ;;
+  6) backbone="hrnet"; backbone_flags=(--use_hr) ;;
+  7) backbone="convnext"; backbone_flags=(--use_convnext) ;;
+  8) backbone="swin"; backbone_flags=(--use_swin) ;;
+  9) backbone="swinv2"; backbone_flags=(--use_swinv2) ;;
+  10) backbone="dino"; backbone_flags=(--use_dino) ;;
+  11) backbone="efficientnet"; backbone_flags=(--use_efficient) ;;
+  12) backbone="nas"; backbone_flags=(--use_NAS) ;;
   *)
     echo "Invalid backbone number: $backbone_choice"
     exit 1
     ;;
 esac
 
-# Dataset selection and corresponding prepare script
+# Dataset selection
 select_menu dataset_choice "Select Dataset:" "1" \
   "Market-1501 (default)" \
   "DukeMTMC-reID" \
