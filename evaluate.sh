@@ -379,12 +379,8 @@ case "$confirm_run" in
 esac
 
 result_file="${model_path}/result.txt"
-timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
 
-echo "[$timestamp] ==== evaluate.sh run start ====" >> "$result_file"
-echo "[$timestamp] model=${name}, which_epoch=${resolved_which_epoch}, test_dir=${test_dir}, gpu_ids=${gpu_ids}, mode=${eval_mode}" >> "$result_file"
-
-echo "[1/2] Running test.py (feature extraction only)..."
+echo "[1/3] Testing..."
 python test.py \
   --gpu_ids "$gpu_ids" \
   --name "$name" \
@@ -397,12 +393,8 @@ if [[ ! -f "pytorch_result.mat" ]]; then
   exit 1
 fi
 
-echo "[2/2] Running ${eval_script}..."
+echo "[2/3] Evaluating..."
 python "$eval_script" | tee -a "$result_file"
 
-end_timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
-echo "[$end_timestamp] ==== evaluate.sh run end ====" >> "$result_file"
-echo
-echo "Done."
+echo "[3/3] Done!"
 echo "Result file     : ${result_file}"
-echo "Feature file    : ./pytorch_result.mat"
