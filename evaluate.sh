@@ -297,13 +297,13 @@ select_menu dataset_choice "Select Evaluation Dataset:" "$default_dataset_choice
   "VIPeR"
 
 case "$dataset_choice" in
-  1) test_dir="./data/Market/pytorch" ;;
-  2) test_dir="./data/Duke/pytorch" ;;
-  3) test_dir="./data/MSMT/pytorch" ;;
-  4) test_dir="./data/CUB/pytorch" ;;
-  5) test_dir="./data/VehicleID/pytorch" ;;
-  6) test_dir="./data/VeRi/pytorch" ;;
-  7) test_dir="./data/VIPeR/pytorch" ;;
+  1) test_dir="./data/Market/pytorch"; eval_dataset_name="Market-1501" ;;
+  2) test_dir="./data/Duke/pytorch"; eval_dataset_name="DukeMTMC-reID" ;;
+  3) test_dir="./data/MSMT/pytorch"; eval_dataset_name="MSMT17" ;;
+  4) test_dir="./data/CUB/pytorch"; eval_dataset_name="CUB-200-2011" ;;
+  5) test_dir="./data/VehicleID/pytorch"; eval_dataset_name="VehicleID" ;;
+  6) test_dir="./data/VeRi/pytorch"; eval_dataset_name="VeRi" ;;
+  7) test_dir="./data/VIPeR/pytorch"; eval_dataset_name="VIPeR" ;;
   *)
     echo "Invalid dataset number: $dataset_choice"
     exit 1
@@ -365,7 +365,7 @@ esac
 
 echo "----------------------------------------"
 echo "model_name     : ${name}"
-echo "eval_dataset   : ${test_dir}"
+echo "eval_dataset   : ${eval_dataset_name}"
 echo "eval_mode      : ${eval_mode}"
 echo "----------------------------------------"
 
