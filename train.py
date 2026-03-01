@@ -334,7 +334,7 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
         epoch_start = time.time()
         epoch_stats = {}
         epoch_tag = format_epoch_tag(epoch, num_epochs)
-        print(f"\n[{epoch_tag}]")
+        print(f"\n{epoch_tag}")
 
         if opt.wa and wa_flag and epoch >=  num_epochs*0.8:
             wa_flag = False
@@ -352,10 +352,10 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
             # Keep batch feedback in tqdm; use compact epoch summary after each epoch.
             pbar = tqdm(
                 total=len(dataloaders[phase]),
-                desc=f"{epoch_tag} [{phase}]",
+                desc=f"[{phase}]",
                 leave=True,
                 dynamic_ncols=True,
-                bar_format="{desc:<26} {percentage:3.0f}%|{bar:24}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]",
+                bar_format="{desc:<10} {percentage:3.0f}%|{bar:24}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]",
             )
             batch_loss = 0.0
             batch_acc = 0.0
@@ -552,7 +552,6 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
         train_stat = epoch_stats.get('train', {})
         val_stat = epoch_stats.get('val', {})
         print(
-            f"[{epoch_tag}] "
             f"time={format_duration(epoch_elapsed)}  "
             f"lr={current_lr:.6f}  "
             f"train(loss/acc)={train_stat.get('loss', 0.0):.4f}/{train_stat.get('acc', 0.0):.4f}  "
