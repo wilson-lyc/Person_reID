@@ -157,7 +157,7 @@ if opt.erasing_p>0:
 if opt.color_jitter:
     transform_train_list = [transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0)] + transform_train_list
 
-print(transform_train_list)
+# print(transform_train_list)
 data_transforms = {
     'train': transforms.Compose( transform_train_list ),
     'val': transforms.Compose(transform_val_list),
