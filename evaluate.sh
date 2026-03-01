@@ -365,6 +365,7 @@ esac
 
 echo "----------------------------------------"
 echo "model_name     : ${name}"
+echo "eval_dataset   : ${test_dir}"
 echo "eval_mode      : ${eval_mode}"
 echo "----------------------------------------"
 
