@@ -154,6 +154,5 @@ selector() {
     # Remove only selector-rendered block, keep previous terminal output.
     printf "\r\033[%dA\033[J" "$rendered_lines"
   fi
-  printf "%s: %b%s%b\n" "$question" "$color_value" "$selected_value" "$color_reset"
   return 0
 }
