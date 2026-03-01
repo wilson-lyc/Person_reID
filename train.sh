@@ -512,7 +512,7 @@ inputer which_epoch "which_epoch" "last"
 run_id="$(python tool/run_id.py)"
 lr_tag="${lr//./p}"
 erasing_tag="${erasing_p//./p}"
-default_run_name="${backbone}_${dataset}_${loss_name}_w${warm_epoch}_s${stride}_b${batchsize}_lr${lr_tag}_re${erasing_tag}_${run_id}"
+default_run_name="${run_id}_${backbone}_${dataset}_${loss_name}_w${warm_epoch}_s${stride}_b${batchsize}_lr${lr_tag}_re${erasing_tag}"
 inputer run_name "run_name" "$default_run_name"
 
 # Configure mirror options before run confirmation.
