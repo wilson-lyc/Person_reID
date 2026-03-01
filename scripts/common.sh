@@ -36,8 +36,8 @@ selector() {
   selected_idx=$((default_index - 1))
 
   if [[ -t 1 ]]; then
-    color_choice="\033[1;33m"
-    color_value="\033[1;32m"
+    color_choice="\033[1;36m"
+    color_value="\033[1;36m"
     color_reset="\033[0m"
   fi
 
@@ -60,8 +60,12 @@ selector() {
   else
     while true; do
       if (( rendered_once == 1 )); then
-        printf "\033[%dA" "$rendered_lines"
-        printf "\033[J"
+        # Restore to the selector block start and clear it before re-render.
+        printf "\033[u\033[J"
+        printf "\033[s"
+      else
+        # Save selector block start cursor position for stable cleanup.
+        printf "\033[s"
       fi
       echo "$question"
       local idx
@@ -106,8 +110,10 @@ selector() {
   printf -v "$__outvar" '%s' "$selected_value"
 
   if [[ -t 0 && -t 1 && (( rendered_once == 1 )) ]]; then
-    # Remove only selector-rendered block, keep previous terminal output.
-    printf "\r\033[%dA\033[J" "$rendered_lines"
+    # Remove selector-rendered block first, then echo final selected value.
+    printf "\033[u\033[J"
+    # Echo the final selected value after confirming with Enter.
+    printf "%b%s%b\n" "$color_value" "$selected_value" "$color_reset"
   fi
   return 0
 }
