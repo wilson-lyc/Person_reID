@@ -597,10 +597,12 @@ train_cmd+=("${loss_flags[@]}")
 
 test_cmd=(python test.py --gpu_ids "$gpu_ids" --name "$run_name" --test_dir "$data_dir" --which_epoch "$which_epoch" --run_id "$run_id")
 
-echo "[1/4] Installing dependencies from requirements.txt..."
+# =========================
+# Execution workflow
+# =========================
+echo "[1/4] Installing dependencies..."
 python -m pip install -r requirements.txt
 
-# Validate raw dataset then run dataset-specific prepare*.py.
 echo "[2/4] Preparing dataset..."
 ensure_dataset_ready "$dataset" "$raw_data_dir" "$data_dir" "$prepare_script"
 

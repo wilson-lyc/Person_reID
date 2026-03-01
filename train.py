@@ -86,7 +86,7 @@ parser.add_argument('--aiter', default=10, type=float, help='enable adversarial 
 
 opt = parser.parse_args()
 run_id = opt.run_id
-print(f"[RUN_ID] {run_id}")
+print(f"[NAME] {opt.name}")
 
 if opt.DG:
     opt.wa = True #DG will enable swa.
@@ -198,7 +198,7 @@ use_gpu = torch.cuda.is_available()
 
 since = time.time()
 inputs, classes = next(iter(dataloaders['train']))
-print(time.time()-since)
+# print(time.time()-since)
 ######################################################################
 # Training the model
 # ------------------
@@ -218,6 +218,15 @@ y_loss['val'] = []
 y_err = {}
 y_err['train'] = []
 y_err['val'] = []
+
+
+def format_duration(seconds):
+    seconds = int(seconds)
+    mins, sec = divmod(seconds, 60)
+    hrs, mins = divmod(mins, 60)
+    if hrs > 0:
+        return f"{hrs:02d}:{mins:02d}:{sec:02d}"
+    return f"{mins:02d}:{sec:02d}"
 
 def fliplr(img):
     '''flip horizontal'''
@@ -317,8 +326,8 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
     )
 
     for epoch in range(num_epochs):
-        print('Epoch {}/{}'.format(epoch, num_epochs - 1))
-        # print('-' * 10)
+        epoch_start = time.time()
+        print(f"Epoch [{epoch + 1}/{num_epochs}]")
         epoch_stats = {}
 
         if opt.wa and wa_flag and epoch >=  num_epochs*0.8:
@@ -334,9 +343,12 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
             else:
                 model.train(False)  # Set model to evaluate mode
 
-            # Phases 'train' and 'val' are visualized in two separate progress bars
-            pbar = tqdm()
-            pbar.reset(total=len(dataloaders[phase].dataset))
+            # Keep batch feedback in tqdm; use compact epoch summary after each epoch.
+            pbar = tqdm(
+                total=len(dataloaders[phase].dataset),
+                desc=f"E{epoch + 1}/{num_epochs} {phase}",
+                leave=False,
+            )
             ordered_dict = collections.OrderedDict(phase="", Loss="", Acc="")
 
             running_loss = 0.0
@@ -531,13 +543,19 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
                 draw_curve(epoch)
             if phase == 'train':
                 scheduler.step()
-        time_elapsed = time.time() - since
-        print('Training complete in {:.0f}m {:.0f}s'.format(
-            time_elapsed // 60, time_elapsed % 60))
-        print()
+        total_elapsed = time.time() - since
+        epoch_elapsed = time.time() - epoch_start
         current_lr = optimizer.param_groups[0]['lr']
         train_stat = epoch_stats.get('train', {})
         val_stat = epoch_stats.get('val', {})
+        print(
+            f"Epoch [{epoch + 1}/{num_epochs}] | elapsed={format_duration(epoch_elapsed)} | "
+            f"lr={current_lr:.6f} | "
+            f"train_loss={train_stat.get('loss', 0.0):.4f} train_acc={train_stat.get('acc', 0.0):.4f} | "
+            f"val_loss={val_stat.get('loss', 0.0):.4f} val_acc={val_stat.get('acc', 0.0):.4f} | "
+            f"best_val_acc={best_val_acc:.4f}"
+        )
+        print()
         lark_log(
             project="Person_reID",
             file="train.py",
@@ -546,7 +564,7 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
                 "event": "train_update",
                 "epoch": epoch + 1,
                 "total_epochs": num_epochs,
-                "elapsed_seconds": int(time_elapsed),
+                "elapsed_seconds": int(total_elapsed),
                 "lr": float(current_lr),
                 "train_loss": float(train_stat.get("loss", 0.0)),
                 "train_acc": float(train_stat.get("acc", 0.0)),
@@ -560,7 +578,7 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
                 title=f"[Train Update] {name} Epoch {epoch + 1}/{num_epochs}",
                 msg=(
                     f"run_id={run_id}\n"
-                    f"epoch={epoch + 1}/{num_epochs}, elapsed={int(time_elapsed//60)}m{int(time_elapsed%60)}s\n"
+                    f"epoch={epoch + 1}/{num_epochs}, elapsed={int(total_elapsed//60)}m{int(total_elapsed%60)}s\n"
                     f"lr={current_lr:.6f}\n"
                     f"train_loss={train_stat.get('loss', 0.0):.4f}, train_acc={train_stat.get('acc', 0.0):.4f}\n"
                     f"val_loss={val_stat.get('loss', 0.0):.4f}, val_acc={val_stat.get('acc', 0.0):.4f}\n"
@@ -569,8 +587,7 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
             )
 
     time_elapsed = time.time() - since
-    print('Training complete in {:.0f}m {:.0f}s'.format(
-        time_elapsed // 60, time_elapsed % 60))
+    print(f"Training complete in {format_duration(time_elapsed)}")
     #print('Best val Acc: {:4f}'.format(best_acc)
 
     # load best model weights

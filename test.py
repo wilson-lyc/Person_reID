@@ -50,6 +50,16 @@ parser.add_argument('--skip_eval', action='store_true', help='skip evaluate_gpu.
 opt = parser.parse_args()
 run_id = opt.run_id
 print(f"[RUN_ID] {run_id}")
+
+
+def format_duration(seconds):
+    seconds = int(seconds)
+    mins, sec = divmod(seconds, 60)
+    hrs, mins = divmod(mins, 60)
+    if hrs > 0:
+        return f"{hrs:02d}:{mins:02d}:{sec:02d}"
+    return f"{mins:02d}:{sec:02d}"
+
 ###load config###
 # load the training config
 config_path = os.path.join('./model',opt.name,'opts.yaml')
@@ -96,7 +106,7 @@ for str_id in str_ids:
     if id >=0:
         gpu_ids.append(id)
 
-print('We use the scale: %s'%opt.ms)
+print(f"[TEST] scale={opt.ms}")
 str_ms = opt.ms.split(',')
 ms = []
 for s in str_ms:
@@ -222,10 +232,10 @@ def fliplr(img):
     img_flip = img.index_select(3,inv_idx)
     return img_flip
 
-def extract_feature(model,dataloaders):
+def extract_feature(model, dataloader, phase_name):
     #features = torch.FloatTensor()
     # count = 0
-    pbar = tqdm()
+    pbar = tqdm(total=len(dataloader.dataset), desc=f"{phase_name}", leave=False)
     if opt.linear_num <= 0:
         if opt.use_swin or opt.use_swinv2 or opt.use_dense or opt.use_convnext:
             opt.linear_num = 1024
@@ -238,7 +248,7 @@ def extract_feature(model,dataloaders):
         else:
             opt.linear_num = 2048
 
-    for iter, data in enumerate(dataloaders):
+    for iter, data in enumerate(dataloader):
         img, label = data
         n, c, h, w = img.size()
         # count += n
@@ -273,10 +283,10 @@ def extract_feature(model,dataloaders):
 
         
         if iter == 0:
-            features = torch.FloatTensor( len(dataloaders.dataset), ff.shape[1])
+            features = torch.FloatTensor(len(dataloader.dataset), ff.shape[1])
         #features = torch.cat((features,ff.data.cpu()), 0)
         start = iter*opt.batchsize
-        end = min( (iter+1)*opt.batchsize, len(dataloaders.dataset))
+        end = min((iter+1)*opt.batchsize, len(dataloader.dataset))
         features[ start:end, :] = ff
     pbar.close()
     return features
@@ -307,8 +317,8 @@ if opt.multi:
     mquery_cam,mquery_label = get_id(mquery_path)
 
 ######################################################################
-# Load Collected data Trained model
-print('-------test-----------')
+# Load trained model
+print("[TEST] building model...")
 if opt.use_dense:
     model_structure = ft_net_dense(opt.nclasses, stride = opt.stride, linear_num=opt.linear_num)
 elif opt.use_NAS:
@@ -356,7 +366,7 @@ if use_gpu:
     model = model.cuda()
 
 
-print('Here I fuse conv and bn for faster inference, and it does not work for transformers. Comment out this following line if you do not want to fuse conv&bn.')
+print("[TEST] fuse conv+bn for faster inference")
 model = fuse_all_conv_bn(model)
 
 # We can optionally trace the forward method with PyTorch JIT so it runs faster.
@@ -366,29 +376,34 @@ model = fuse_all_conv_bn(model)
 #dummy_forward_input = torch.rand(opt.batchsize, 3, h, w).cuda()
 #model = torch.jit.trace(model, dummy_forward_input)
 
-print(model)
+print(f"[TEST] model ready: {model.__class__.__name__}")
 # Extract feature
 since = time.time()
 with torch.no_grad():
-    gallery_feature = extract_feature(model,dataloaders['gallery'])
-    query_feature = extract_feature(model,dataloaders['query'])
+    gallery_feature = extract_feature(model, dataloaders['gallery'], "extract gallery")
+    query_feature = extract_feature(model, dataloaders['query'], "extract query")
     if opt.multi:
-        mquery_feature = extract_feature(model,dataloaders['multi-query'])
+        mquery_feature = extract_feature(model, dataloaders['multi-query'], "extract multi-query")
 time_elapsed = time.time() - since
-print('Training complete in {:.0f}m {:.2f}s'.format(
-            time_elapsed // 60, time_elapsed % 60))
+print(f"[TEST] feature extraction complete in {format_duration(time_elapsed)}")
 # Save to Matlab for check
 result = {'gallery_f':gallery_feature.numpy(),'gallery_label':gallery_label,'gallery_cam':gallery_cam,'query_f':query_feature.numpy(),'query_label':query_label,'query_cam':query_cam}
 scipy.io.savemat('pytorch_result.mat',result)
 
-print(opt.name)
+print(f"[TEST] run={opt.name}")
 result = './model/%s/result.txt'%opt.name
 eval_cmd = 'python evaluate_gpu.py | tee -a %s'%result
 eval_return_code = 0
 if opt.skip_eval:
-    print('Skip evaluation in test.py because --skip_eval is set.')
+    print('[TEST] skip evaluation (--skip_eval)')
 else:
+    print('[TEST] evaluating metrics...')
     eval_return_code = os.system(eval_cmd)
+print(
+    f"[TEST] done | elapsed={format_duration(time_elapsed)} | "
+    f"result_mat=pytorch_result.mat | result_txt={result} | "
+    f"eval_skipped={bool(opt.skip_eval)} | evaluate_return={eval_return_code}"
+)
 
 lark_log(
     project="Person_reID",
