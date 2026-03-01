@@ -159,8 +159,10 @@ use_hf_mirror="$(confirmer "Use Hugging Face mirror (https://hf-mirror.com)?" "y
 cmd=(python load_hf_models.py "${backbone_flags[@]}")
 if [[ "$use_hf_mirror" == "Y" ]]; then
   export HF_ENDPOINT="https://hf-mirror.com"
+  echo "Pulling model weights from Hugging Face via mirror: ${HF_ENDPOINT} ..."
 else
   unset HF_ENDPOINT || true
+  echo "Pulling model weights from Hugging Face ..."
 fi
 
 "${cmd[@]}"
