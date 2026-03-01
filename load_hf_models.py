@@ -6,6 +6,8 @@ import timm
 import torch
 import torch.nn as nn
 
+MODEL_INPUT_SIZE = (256, 128)
+
 
 def _force_cpu_only() -> None:
     # Ensure this script never depends on CUDA runtime.
@@ -36,15 +38,15 @@ def preload_swin() -> None:
     del model_ft
 
 
-def preload_swinv2(input_size: tuple[int, int]) -> None:
+def preload_swinv2() -> None:
     print(
         "[timm] preload path: swinv2_base_window8_256 "
-        f"(pretrained=False, img_size={input_size}, drop_path_rate=0.2) + load pretrained state"
+        f"(pretrained=False, img_size={MODEL_INPUT_SIZE}, drop_path_rate=0.2) + load pretrained state"
     )
     model_ft = timm.create_model(
         "swinv2_base_window8_256",
         pretrained=False,
-        img_size=input_size,
+        img_size=MODEL_INPUT_SIZE,
         drop_path_rate=0.2,
     )
     model_ft = model_ft.to("cpu")
@@ -56,15 +58,15 @@ def preload_swinv2(input_size: tuple[int, int]) -> None:
     del model_full
 
 
-def preload_dino(input_size: tuple[int, int]) -> None:
+def preload_dino() -> None:
     print(
         "[timm] preload path: vit_base_patch16_dinov3.lvd1689m "
-        f"(pretrained=False, img_size={input_size}, drop_path_rate=0.2) + load pretrained state"
+        f"(pretrained=False, img_size={MODEL_INPUT_SIZE}, drop_path_rate=0.2) + load pretrained state"
     )
     model_ft = timm.create_model(
         "vit_base_patch16_dinov3.lvd1689m",
         pretrained=False,
-        img_size=input_size,
+        img_size=MODEL_INPUT_SIZE,
         drop_path_rate=0.2,
     )
     model_ft = model_ft.to("cpu")
@@ -92,13 +94,6 @@ def preload_hrnet() -> None:
     del model_ft
 
 
-def preload_hf_repo(repo_id: str) -> None:
-    print(f"[hf] snapshot_download: {repo_id}")
-    from huggingface_hub import snapshot_download
-
-    snapshot_download(repo_id=repo_id)
-
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Preload/download model files locally (no training)."
@@ -108,24 +103,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--use_dino", action="store_true", help="preload DINOv3 ViT-Base")
     parser.add_argument("--use_convnext", action="store_true", help="preload ConvNeXt-Base")
     parser.add_argument("--use_hr", action="store_true", help="preload HRNet-W18")
-    parser.add_argument(
-        "--height",
-        type=int,
-        default=256,
-        help="input height for swinv2/dino preload path to match training model construction",
-    )
-    parser.add_argument(
-        "--width",
-        type=int,
-        default=128,
-        help="input width for swinv2/dino preload path to match training model construction",
-    )
-    parser.add_argument(
-        "--hf-repos",
-        type=str,
-        default="",
-        help="extra Hugging Face repo ids to snapshot_download, comma-separated",
-    )
     parser.add_argument(
         "--use-hf-mirror",
         "--use_hf_mirror",
@@ -159,11 +136,8 @@ def main() -> int:
         )
         return 2
 
-    input_size = (args.height, args.width)
     print(f"[run] models={targets}")
-    print(f"[run] input_size={input_size}")
-    if args.hf_repos.strip():
-        print(f"[run] extra hf repos={args.hf_repos}")
+    print(f"[run] input_size={MODEL_INPUT_SIZE}")
 
     failed: list[str] = []
 
@@ -172,9 +146,9 @@ def main() -> int:
             if target == "swin":
                 preload_swin()
             elif target == "swinv2":
-                preload_swinv2(input_size)
+                preload_swinv2()
             elif target == "dino":
-                preload_dino(input_size)
+                preload_dino()
             elif target == "convnext":
                 preload_convnext()
             elif target == "hrnet":
@@ -182,15 +156,6 @@ def main() -> int:
         except Exception:
             failed.append(target)
             print(f"[error] failed target: {target}")
-            print(traceback.format_exc())
-
-    extra_repos = [x.strip() for x in args.hf_repos.split(",") if x.strip()]
-    for repo_id in extra_repos:
-        try:
-            preload_hf_repo(repo_id)
-        except Exception:
-            failed.append(f"hf:{repo_id}")
-            print(f"[error] failed hf repo: {repo_id}")
             print(traceback.format_exc())
 
     if failed:

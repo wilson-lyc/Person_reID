@@ -109,12 +109,7 @@ esac
 
 use_hf_mirror="$(confirmer "Use Hugging Face mirror (https://hf-mirror.com)?" "yes")"
 
-read -r -p "Input height for SwinV2/DINO [256]: " input_h
-read -r -p "Input width for SwinV2/DINO [128]: " input_w
-input_h="${input_h:-256}"
-input_w="${input_w:-128}"
-
-cmd=(python load_hf_models.py "${backbone_flags[@]}" --height "$input_h" --width "$input_w")
+cmd=(python load_hf_models.py "${backbone_flags[@]}")
 if [[ "$use_hf_mirror" == "Y" ]]; then
   cmd+=(--use-hf-mirror)
 fi
