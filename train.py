@@ -346,7 +346,7 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
             # Keep batch feedback in tqdm; use compact epoch summary after each epoch.
             pbar = tqdm(
                 total=len(dataloaders[phase].dataset),
-                desc=f"E{epoch + 1}/{num_epochs} {phase}",
+                desc=phase,
                 leave=True,
             )
             ordered_dict = collections.OrderedDict(phase="", Loss="", Acc="")
