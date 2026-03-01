@@ -1,6 +1,5 @@
 # Don't track content of these folders
 outputs/
-data/
 .vscode/
 model/*
 logs/
