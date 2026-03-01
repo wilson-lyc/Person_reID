@@ -99,8 +99,6 @@ ui_select() {
   local page_size=8
   local start=0
   local end=0
-  local rendered_lines=0
-  local rendered_once=0
   local tty_mode=0
 
   if [[ ${#options[@]} -eq 0 ]]; then
@@ -135,39 +133,35 @@ ui_select() {
     done
   else
     local term_lines
-    term_lines="$(tput lines 2>/dev/null || echo 24)"
+    local has_tput=0
+    local use_alt_screen=0
+    local canceled=0
+    local interrupted=0
+    local idx
+    if command -v tput >/dev/null 2>&1; then
+      has_tput=1
+    fi
+
+    if (( has_tput == 1 )); then
+      term_lines="$(tput lines 2>/dev/null || echo 24)"
+    else
+      term_lines=24
+    fi
     page_size=$((term_lines - 6))
     if (( page_size < 5 )); then
       page_size=5
     fi
 
-    _ui_clear_select_block() {
-      local lines="$1"
-      local j
-      for ((j = 0; j < lines; j++)); do
-        printf "\r\033[1A\033[2K"
-      done
-    }
-
-    while true; do
-      if (( rendered_once == 1 )); then
-        _ui_clear_select_block "$rendered_lines"
-      fi
-
-      if (( selected_idx < start )); then
-        start=$selected_idx
-      fi
-      if (( selected_idx >= start + page_size )); then
-        start=$((selected_idx - page_size + 1))
-      fi
-      end=$((start + page_size - 1))
-      if (( end >= ${#options[@]} )); then
-        end=$((${#options[@]} - 1))
+    _ui_select_draw() {
+      if (( has_tput == 1 )); then
+        tput cup 0 0 2>/dev/null || true
+        tput ed 2>/dev/null || true
+      else
+        clear
       fi
 
       printf "%s\n" "$title"
       printf "  (Up/Down or k/j, Enter confirm, q cancel)\n"
-      local idx
       for ((idx = start; idx <= end; idx++)); do
         if (( idx == selected_idx )); then
           if ui_use_color; then
@@ -182,12 +176,43 @@ ui_select() {
       if (( ${#options[@]} > page_size )); then
         printf "  [%d-%d / %d]\n" "$((start + 1))" "$((end + 1))" "${#options[@]}"
       fi
+    }
 
-      rendered_lines=$((3 + end - start + 1))
-      if (( ${#options[@]} > page_size )); then
-        rendered_lines=$((rendered_lines + 1))
+    _ui_select_restore() {
+      if (( has_tput == 1 )); then
+        tput cnorm 2>/dev/null || true
+        if (( use_alt_screen == 1 )); then
+          tput rmcup 2>/dev/null || true
+        fi
       fi
-      rendered_once=1
+    }
+
+    _ui_select_on_interrupt() {
+      interrupted=1
+      _ui_select_restore
+      trap - INT TERM
+      return 130
+    }
+
+    if (( has_tput == 1 )); then
+      tput smcup 2>/dev/null && use_alt_screen=1 || use_alt_screen=0
+      tput civis 2>/dev/null || true
+    fi
+    trap '_ui_select_on_interrupt' INT TERM
+
+    while true; do
+      if (( selected_idx < start )); then
+        start=$selected_idx
+      fi
+      if (( selected_idx >= start + page_size )); then
+        start=$((selected_idx - page_size + 1))
+      fi
+      end=$((start + page_size - 1))
+      if (( end >= ${#options[@]} )); then
+        end=$((${#options[@]} - 1))
+      fi
+
+      _ui_select_draw
 
       IFS= read -rsn1 key
       if [[ "$key" == $'\x1b' ]]; then
@@ -208,9 +233,8 @@ ui_select() {
           fi
           ;;
         q|Q)
-          _ui_clear_select_block "$rendered_lines"
-          ui_warn "Operation canceled."
-          return 130
+          canceled=1
+          break
           ;;
         ""|$'\n'|$'\r')
           break
@@ -218,11 +242,21 @@ ui_select() {
       esac
     done
 
-    _ui_clear_select_block "$rendered_lines"
-    if ui_use_color; then
-      printf "\033[1;36m%s\033[0m\n" "${options[$selected_idx]}"
-    else
-      printf "%s\n" "${options[$selected_idx]}"
+    trap - INT TERM
+    _ui_select_restore
+    if (( interrupted == 1 )); then
+      return 130
+    fi
+    if (( canceled == 1 )); then
+      ui_warn "Operation canceled."
+      return 130
+    fi
+    if (( use_alt_screen == 0 )); then
+      if ui_use_color; then
+        printf "\033[1;36m%s\033[0m\n" "${options[$selected_idx]}"
+      else
+        printf "%s\n" "${options[$selected_idx]}"
+      fi
     fi
   fi
 
