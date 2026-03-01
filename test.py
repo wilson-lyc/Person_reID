@@ -21,6 +21,7 @@ from torch.optim import swa_utils
 from tqdm import tqdm
 from model import ft_net, ft_net_dense, ft_net_hr, ft_net_swin, ft_net_swinv2, ft_net_dino, ft_net_efficient, ft_net_NAS, ft_net_convnext, PCB, PCB_test
 from utils import fuse_all_conv_bn
+from console_logger import build_prefixed_logger
 from tool.lark import lark_notify, lark_log
 version =  torch.__version__
 
@@ -49,7 +50,8 @@ parser.add_argument('--skip_eval', action='store_true', help='skip evaluate_gpu.
 
 opt = parser.parse_args()
 run_id = opt.run_id
-print(f"[RUN_ID] {run_id}")
+log = build_prefixed_logger("test", color="cyan")
+log(f"name={opt.name}")
 
 
 def format_duration(seconds):
@@ -59,6 +61,7 @@ def format_duration(seconds):
     if hrs > 0:
         return f"{hrs:02d}:{mins:02d}:{sec:02d}"
     return f"{mins:02d}:{sec:02d}"
+
 
 ###load config###
 # load the training config
@@ -106,12 +109,12 @@ for str_id in str_ids:
     if id >=0:
         gpu_ids.append(id)
 
-print(f"[TEST] scale={opt.ms}")
 str_ms = opt.ms.split(',')
 ms = []
 for s in str_ms:
     s_f = float(s)
     ms.append(math.sqrt(s_f))
+
 
 # set gpu ids
 if len(gpu_ids)>0:
@@ -212,9 +215,9 @@ def load_network(network):
             #network = torch.compile(network, mode="reduce-overhead", dynamic = True) # pytorch 2.0
         if 'average' in opt.which_epoch: # load averaged model.
             network = swa_utils.AveragedModel(network)
-        network.load_state_dict(torch.load(save_path))
+            network.load_state_dict(torch.load(save_path))
         if 'average' in opt.which_epoch:
-            print("We average %d snapshots"%network.n_averaged)
+            log("we average %d snapshots" % network.n_averaged)
             #swa_utils.update_bn(dataloaders['query'], network, device='cuda:0')
             network = network.module
     return network
@@ -288,7 +291,7 @@ def extract_feature(model, dataloader, phase_name):
         start = iter*opt.batchsize
         end = min((iter+1)*opt.batchsize, len(dataloader.dataset))
         features[ start:end, :] = ff
-    pbar.close()
+    pbar.refresh()
     return features
 
 def get_id(img_path):
@@ -318,7 +321,7 @@ if opt.multi:
 
 ######################################################################
 # Load trained model
-print("[TEST] building model...")
+log("building model...")
 if opt.use_dense:
     model_structure = ft_net_dense(opt.nclasses, stride = opt.stride, linear_num=opt.linear_num)
 elif opt.use_NAS:
@@ -366,7 +369,7 @@ if use_gpu:
     model = model.cuda()
 
 
-print("[TEST] fuse conv+bn for faster inference")
+log("fuse conv+bn for faster inference")
 model = fuse_all_conv_bn(model)
 
 # We can optionally trace the forward method with PyTorch JIT so it runs faster.
@@ -376,7 +379,7 @@ model = fuse_all_conv_bn(model)
 #dummy_forward_input = torch.rand(opt.batchsize, 3, h, w).cuda()
 #model = torch.jit.trace(model, dummy_forward_input)
 
-print(f"[TEST] model ready: {model.__class__.__name__}")
+log(f"model ready: {model.__class__.__name__}")
 # Extract feature
 since = time.time()
 with torch.no_grad():
@@ -385,22 +388,22 @@ with torch.no_grad():
     if opt.multi:
         mquery_feature = extract_feature(model, dataloaders['multi-query'], "extract multi-query")
 time_elapsed = time.time() - since
-print(f"[TEST] feature extraction complete in {format_duration(time_elapsed)}")
+log(f"feature extraction complete in {format_duration(time_elapsed)}")
 # Save to Matlab for check
 result = {'gallery_f':gallery_feature.numpy(),'gallery_label':gallery_label,'gallery_cam':gallery_cam,'query_f':query_feature.numpy(),'query_label':query_label,'query_cam':query_cam}
 scipy.io.savemat('pytorch_result.mat',result)
 
-print(f"[TEST] run={opt.name}")
+log(f"run={opt.name}")
 result = './model/%s/result.txt'%opt.name
 eval_cmd = 'python evaluate_gpu.py | tee -a %s'%result
 eval_return_code = 0
 if opt.skip_eval:
-    print('[TEST] skip evaluation (--skip_eval)')
+    log("skip evaluation (--skip_eval)")
 else:
-    print('[TEST] evaluating metrics...')
+    log("evaluating metrics...")
     eval_return_code = os.system(eval_cmd)
-print(
-    f"[TEST] done | elapsed={format_duration(time_elapsed)} | "
+log(
+    f"done | elapsed={format_duration(time_elapsed)} | "
     f"result_mat=pytorch_result.mat | result_txt={result} | "
     f"eval_skipped={bool(opt.skip_eval)} | evaluate_return={eval_return_code}"
 )

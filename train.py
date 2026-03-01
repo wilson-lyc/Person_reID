@@ -27,6 +27,7 @@ from circle_loss import CircleLoss, convert_label_to_similarity
 from instance_loss import InstanceLoss
 from ODFA import ODFA
 from utils import save_network
+from console_logger import build_prefixed_logger
 from tool.lark import lark_notify, lark_log
 version =  torch.__version__
 from pytorch_metric_learning import losses, miners #pip install pytorch-metric-learning
@@ -86,7 +87,8 @@ parser.add_argument('--aiter', default=10, type=float, help='enable adversarial 
 
 opt = parser.parse_args()
 run_id = opt.run_id
-print(f"[NAME] {opt.name}")
+log = build_prefixed_logger("train", color="green")
+log(f"name={opt.name}")
 
 if opt.DG:
     opt.wa = True #DG will enable swa.
@@ -333,7 +335,7 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
             wa_flag = False
             swa_model = swa_utils.AveragedModel(model)
             swa_model.avg_fn = swa_utils.get_ema_avg_fn(decay=0.996)
-            print('start weight avg')
+            log("start weight avg")
         
         # Each epoch has a training and validation phase
         for phase in ['train', 'val']:
@@ -545,7 +547,7 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
         current_lr = optimizer.param_groups[0]['lr']
         train_stat = epoch_stats.get('train', {})
         val_stat = epoch_stats.get('val', {})
-        print(
+        log(
             f"Epoch [{epoch + 1}/{num_epochs}] | elapsed={format_duration(epoch_elapsed)} | "
             f"lr={current_lr:.6f} | "
             f"train_loss={train_stat.get('loss', 0.0):.4f} train_acc={train_stat.get('acc', 0.0):.4f} | "
@@ -583,7 +585,7 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
             )
 
     time_elapsed = time.time() - since
-    print(f"Training complete in {format_duration(time_elapsed)}")
+    log(f"training complete in {format_duration(time_elapsed)}")
     #print('Best val Acc: {:4f}'.format(best_acc)
 
     # load best model weights
