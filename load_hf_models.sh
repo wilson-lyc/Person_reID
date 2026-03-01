@@ -22,6 +22,16 @@ select_menu() {
   shift 3
   local options=("$@")
   local choice=""
+  local selected_idx=0
+  local selected_text=""
+  local input_prompt="Enter choice [${default_choice}]: "
+  local color_selected=""
+  local color_reset=""
+
+  if [[ -t 1 ]]; then
+    color_selected="\033[1;36m"
+    color_reset="\033[0m"
+  fi
 
   echo "$title"
   for i in "${!options[@]}"; do
@@ -29,13 +39,26 @@ select_menu() {
   done
 
   while true; do
-    read -r -p "Enter choice [${default_choice}]: " choice
+    read -r -p "${input_prompt}" choice
     choice="${choice:-$default_choice}"
     if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#options[@]} )); then
+      selected_idx=$((choice - 1))
+      selected_text="${options[$selected_idx]}"
       break
     fi
-    echo "Invalid choice: ${choice}"
+    if [[ -t 1 ]]; then
+      printf "\033[1A\r\033[2K"
+    fi
+    input_prompt="Invalid choice (${choice}). Enter choice [${default_choice}]: "
   done
+
+  if [[ -t 1 ]]; then
+    printf "\033[%dA" "$(( ${#options[@]} + 2 ))"
+    printf "\033[J"
+    printf "%s %b%s%b\n" "$title" "$color_selected" "$selected_text" "$color_reset"
+  else
+    printf "%s %s\n" "$title" "$selected_text"
+  fi
 
   printf -v "$__outvar" '%s' "$choice"
 }
@@ -46,6 +69,14 @@ confirmer() {
   local answer
   local prompt_suffix=""
   local default_answer=""
+  local color_selected=""
+  local color_reset=""
+  local shown_answer=""
+
+  if [[ -t 2 ]]; then
+    color_selected="\033[1;36m"
+    color_reset="\033[0m"
+  fi
 
   case "$default_choice" in
     yes)
@@ -67,11 +98,27 @@ confirmer() {
     answer="${answer:-$default_answer}"
     case "$answer" in
       Y|n)
+        if [[ -t 2 ]]; then
+          if [[ "$answer" == "Y" ]]; then
+            shown_answer="Y"
+          else
+            shown_answer="N"
+          fi
+          printf "\033[1A\r\033[2K" >&2
+          printf "%s: %b%s%b\n" "$prompt" "$color_selected" "$shown_answer" "$color_reset" >&2
+        else
+          if [[ "$answer" == "Y" ]]; then
+            shown_answer="Y"
+          else
+            shown_answer="N"
+          fi
+          printf "%s: %s\n" "$prompt" "$shown_answer" >&2
+        fi
         printf '%s\n' "$answer"
         return 0
         ;;
       *)
-        echo "Invalid input. Please enter 'Y' or 'n'."
+        echo "Invalid input. Please enter exactly 'Y' or 'n' (or press Enter for default)."
         ;;
     esac
   done
@@ -112,14 +159,8 @@ use_hf_mirror="$(confirmer "Use Hugging Face mirror (https://hf-mirror.com)?" "y
 cmd=(python load_hf_models.py "${backbone_flags[@]}")
 if [[ "$use_hf_mirror" == "Y" ]]; then
   export HF_ENDPOINT="https://hf-mirror.com"
-  echo "HF_ENDPOINT=${HF_ENDPOINT}"
 else
   unset HF_ENDPOINT || true
 fi
 
-echo
-echo "Running:"
-printf '  %q' "${cmd[@]}"
-echo
-echo
 "${cmd[@]}"

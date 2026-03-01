@@ -18,11 +18,9 @@ def _force_cpu_only() -> None:
     except Exception:
         # Keep compatibility with older torch versions.
         pass
-    print("[device] cpu-only mode enabled")
 
 
 def preload_swin() -> None:
-    print("[timm] preload path: swin_base_patch4_window7_224 (pretrained=True, drop_path_rate=0.2)")
     model_ft = timm.create_model(
         "swin_base_patch4_window7_224", pretrained=True, drop_path_rate=0.2
     )
@@ -33,10 +31,6 @@ def preload_swin() -> None:
 
 
 def preload_swinv2() -> None:
-    print(
-        "[timm] preload path: swinv2_base_window8_256 "
-        f"(pretrained=False, img_size={MODEL_INPUT_SIZE}, drop_path_rate=0.2) + load pretrained state"
-    )
     model_ft = timm.create_model(
         "swinv2_base_window8_256",
         pretrained=False,
@@ -53,10 +47,6 @@ def preload_swinv2() -> None:
 
 
 def preload_dino() -> None:
-    print(
-        "[timm] preload path: vit_base_patch16_dinov3.lvd1689m "
-        f"(pretrained=False, img_size={MODEL_INPUT_SIZE}, drop_path_rate=0.2) + load pretrained state"
-    )
     model_ft = timm.create_model(
         "vit_base_patch16_dinov3.lvd1689m",
         pretrained=False,
@@ -73,7 +63,6 @@ def preload_dino() -> None:
 
 
 def preload_convnext() -> None:
-    print("[timm] preload path: convnext_base (pretrained=True, drop_path_rate=0.2)")
     model_ft = timm.create_model("convnext_base", pretrained=True, drop_path_rate=0.2)
     model_ft = model_ft.to("cpu")
     model_ft.head = nn.Sequential()
@@ -81,7 +70,6 @@ def preload_convnext() -> None:
 
 
 def preload_hrnet() -> None:
-    print("[timm] preload path: hrnet_w18 (pretrained=True)")
     model_ft = timm.create_model("hrnet_w18", pretrained=True)
     model_ft = model_ft.to("cpu")
     model_ft.classifier = nn.Sequential()
@@ -122,9 +110,6 @@ def main() -> int:
             "Please pass at least one flag, e.g. --use_swin or --use_dino"
         )
         return 2
-
-    print(f"[run] models={targets}")
-    print(f"[run] input_size={MODEL_INPUT_SIZE}")
 
     failed: list[str] = []
 
