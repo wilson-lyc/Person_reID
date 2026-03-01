@@ -235,7 +235,7 @@ def fliplr(img):
 def extract_feature(model, dataloader, phase_name):
     #features = torch.FloatTensor()
     # count = 0
-    pbar = tqdm(total=len(dataloader.dataset), desc=f"{phase_name}", leave=False)
+    pbar = tqdm(total=len(dataloader.dataset), desc=f"{phase_name}", leave=True)
     if opt.linear_num <= 0:
         if opt.use_swin or opt.use_swinv2 or opt.use_dense or opt.use_convnext:
             opt.linear_num = 1024

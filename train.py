@@ -347,7 +347,7 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
             pbar = tqdm(
                 total=len(dataloaders[phase].dataset),
                 desc=f"E{epoch + 1}/{num_epochs} {phase}",
-                leave=False,
+                leave=True,
             )
             ordered_dict = collections.OrderedDict(phase="", Loss="", Acc="")
 
