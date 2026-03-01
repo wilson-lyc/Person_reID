@@ -21,12 +21,6 @@ def _force_cpu_only() -> None:
     print("[device] cpu-only mode enabled")
 
 
-def _set_hf_endpoint(use_hf_mirror: bool) -> None:
-    if use_hf_mirror:
-        os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-        print(f"[hf] HF_ENDPOINT={os.environ['HF_ENDPOINT']}")
-
-
 def preload_swin() -> None:
     print("[timm] preload path: swin_base_patch4_window7_224 (pretrained=True, drop_path_rate=0.2)")
     model_ft = timm.create_model(
@@ -103,19 +97,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--use_dino", action="store_true", help="preload DINOv3 ViT-Base")
     parser.add_argument("--use_convnext", action="store_true", help="preload ConvNeXt-Base")
     parser.add_argument("--use_hr", action="store_true", help="preload HRNet-W18")
-    parser.add_argument(
-        "--use-hf-mirror",
-        "--use_hf_mirror",
-        action="store_true",
-        help="use Hugging Face mirror by setting HF_ENDPOINT=https://hf-mirror.com",
-    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     _force_cpu_only()
-    _set_hf_endpoint(args.use_hf_mirror)
 
     targets: list[str] = []
     if args.use_swin:
