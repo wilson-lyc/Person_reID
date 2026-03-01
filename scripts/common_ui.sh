@@ -12,11 +12,11 @@ ui_badge() {
   local text="$2"
   if ui_use_color; then
     case "$kind" in
-      info)    printf '\033[1;37;44m INFO \033[0m %s\n' "$text" ;;
-      tip)     printf '\033[1;37;46m TIP  \033[0m %s\n' "$text" ;;
-      success) printf '\033[1;37;42m OK   \033[0m %s\n' "$text" ;;
-      warn)    printf '\033[1;37;43m WARN \033[0m %s\n' "$text" ;;
-      error)   printf '\033[1;37;41m ERR  \033[0m %s\n' "$text" ;;
+      info)    printf '\033[1;97;44m INFO \033[0m %s\n' "$text" ;;
+      tip)     printf '\033[1;97;46m TIP  \033[0m %s\n' "$text" ;;
+      success) printf '\033[1;97;42m OK   \033[0m %s\n' "$text" ;;
+      warn)    printf '\033[1;97;43m WARN \033[0m %s\n' "$text" ;;
+      error)   printf '\033[1;97;41m ERR  \033[0m %s\n' "$text" ;;
       *)       printf '%s\n' "$text" ;;
     esac
   else
