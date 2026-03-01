@@ -65,6 +65,8 @@ selector() {
   local color_choice=""
   local color_value=""
   local color_reset=""
+  local rendered_lines=0
+  local rendered_once=0
 
   if [[ ${#choices[@]} -eq 0 ]]; then
     echo "selector: requires at least one option."
@@ -102,7 +104,10 @@ selector() {
     done
   else
     while true; do
-      clear
+      if (( rendered_once == 1 )); then
+        printf "\033[%dA" "$rendered_lines"
+        printf "\033[J"
+      fi
       echo "$question"
       local idx
       for idx in "${!choices[@]}"; do
@@ -112,6 +117,8 @@ selector() {
           printf "  %s\n" "${choices[$idx]}"
         fi
       done
+      rendered_lines=$((1 + ${#choices[@]}))
+      rendered_once=1
 
       IFS= read -rsn1 key
       if [[ "$key" == $'\x1b' ]]; then
@@ -143,6 +150,10 @@ selector() {
   SELECTOR_VALUE="$selected_value"
   printf -v "$__outvar" '%s' "$selected_value"
 
+  if [[ -t 0 && -t 1 && (( rendered_once == 1 )) ]]; then
+    printf "\033[%dA" "$rendered_lines"
+    printf "\033[J"
+  fi
   printf "%s: %b%s%b\n" "$question" "$color_value" "$selected_value" "$color_reset"
   return 0
 }
