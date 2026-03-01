@@ -12,11 +12,11 @@ ui_badge() {
   local text="$2"
   if ui_use_color; then
     case "$kind" in
-      info)    printf '\033[1;97;44m INFO \033[0m %s\n' "$text" ;;
-      tip)     printf '\033[1;97;46m TIP  \033[0m %s\n' "$text" ;;
-      success) printf '\033[1;97;42m OK   \033[0m %s\n' "$text" ;;
-      warn)    printf '\033[1;97;43m WARN \033[0m %s\n' "$text" ;;
-      error)   printf '\033[1;97;41m ERR  \033[0m %s\n' "$text" ;;
+      info)    printf '\033[1;94m[INFO]\033[0m %s\n' "$text" ;;
+      tip)     printf '\033[1;96m[TIP]\033[0m %s\n' "$text" ;;
+      success) printf '\033[1;92m[OK]\033[0m %s\n' "$text" ;;
+      warn)    printf '\033[1;93m[WARN]\033[0m %s\n' "$text" ;;
+      error)   printf '\033[1;91m[ERR]\033[0m %s\n' "$text" ;;
       *)       printf '%s\n' "$text" ;;
     esac
   else
@@ -252,6 +252,13 @@ ui_select() {
       return 130
     fi
     if (( use_alt_screen == 0 )); then
+      # Clear selector menu first, then echo the final selected value.
+      if (( has_tput == 1 )); then
+        tput cup 0 0 2>/dev/null || true
+        tput ed 2>/dev/null || true
+      else
+        clear
+      fi
       if ui_use_color; then
         printf "\033[1;36m%s\033[0m\n" "${options[$selected_idx]}"
       else
@@ -264,35 +271,4 @@ ui_select() {
   UI_SELECT_VALUE="${options[$selected_idx]}"
   printf -v "$__out_idx_var" '%s' "$UI_SELECT_INDEX"
   printf -v "$__out_val_var" '%s' "$UI_SELECT_VALUE"
-}
-
-# Boolean confirm built on ui_select.
-# Usage:
-#   ui_confirm "Prompt?" "y|n" ["yes_label"] ["no_label"]
-# Output:
-#   prints y or n
-ui_confirm() {
-  local prompt="$1"
-  local default_choice="${2:-y}"
-  local yes_label="${3:-yes}"
-  local no_label="${4:-no}"
-  local default_index=1
-  local idx=""
-  local val=""
-
-  case "$default_choice" in
-    y|Y) default_index=1 ;;
-    n|N) default_index=2 ;;
-    *)
-      ui_error "ui_confirm: default must be y or n."
-      return 1
-      ;;
-  esac
-
-  ui_select idx val "$prompt" "$default_index" "$yes_label" "$no_label" >&2 || return $?
-  if [[ "$idx" == "1" ]]; then
-    printf 'y\n'
-  else
-    printf 'n\n'
-  fi
 }

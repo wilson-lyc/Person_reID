@@ -50,17 +50,6 @@ demo_input() {
   ui_success "Collected: warm_epoch=${epochs}, lr=${lr}, run_name=${run_name}"
 }
 
-demo_confirm() {
-  local yn=""
-  echo
-  yn="$(ui_confirm "Enable color_jitter?" "n" "enable" "disable")"
-  if [[ "$yn" == "y" ]]; then
-    ui_success "color_jitter = enabled"
-  else
-    ui_info "color_jitter = disabled"
-  fi
-}
-
 demo_paged_select() {
   local i
   local -a options=()
@@ -94,7 +83,6 @@ main() {
     if ! ui_select _menu_idx action "Choose a UI test action:" "1" \
       "Show badge styles" \
       "Run validated input demo" \
-      "Run boolean confirm demo" \
       "Run paged selector demo" \
       "Run all demos" \
       "Exit"; then
@@ -108,16 +96,12 @@ main() {
       "Run validated input demo")
         demo_input
         ;;
-      "Run boolean confirm demo")
-        demo_confirm
-        ;;
       "Run paged selector demo")
         demo_paged_select
         ;;
       "Run all demos")
         demo_badges
         demo_input
-        demo_confirm
         demo_paged_select
         ;;
       "Exit")
