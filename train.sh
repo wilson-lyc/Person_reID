@@ -29,13 +29,6 @@ EOF
   echo "============================================================"
 }
 
-print_project_info() {
-  echo "Designed by Wilson | Implemented by Codex"
-  echo "Script: $(basename "$0")"
-  echo "Project codebase: https://github.com/layumi/Person_reID_baseline_pytorch"
-  echo
-}
-
 # Multi-option select menu
 select_menu() {
   local __outvar="$1"
@@ -432,7 +425,6 @@ ensure_ibn_checkpoint() {
 # =========================
 clear
 print_banner
-print_project_info
 
 # Backbone selection
 select_menu backbone_choice "Select Backbone:" "1" \
