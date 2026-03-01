@@ -3,29 +3,20 @@ import os
 import traceback
 
 import timm
+import torch
+import torch.nn as nn
 
 
-TIMM_BACKBONES = {
-    "swin": "swin_base_patch4_window7_224",
-    "swinv2": "swinv2_base_window8_256",
-    "dino": "vit_base_patch16_dinov3.lvd1689m",
-    "convnext": "convnext_base",
-    "hrnet": "hrnet_w18",
-}
-
-def _set_cache_env(cache_dir: str | None) -> None:
-    if not cache_dir:
-        return
-    cache_dir = os.path.abspath(cache_dir)
-    os.makedirs(cache_dir, exist_ok=True)
-    os.environ["HF_HOME"] = os.path.join(cache_dir, "hf")
-    os.environ["HUGGINGFACE_HUB_CACHE"] = os.path.join(cache_dir, "hf", "hub")
-    os.environ["TORCH_HOME"] = os.path.join(cache_dir, "torch")
-    os.environ["TIMM_CACHE_DIR"] = os.path.join(cache_dir, "timm")
-    print(f"[cache] root={cache_dir}")
-    print(f"[cache] HF_HOME={os.environ['HF_HOME']}")
-    print(f"[cache] TORCH_HOME={os.environ['TORCH_HOME']}")
-    print(f"[cache] TIMM_CACHE_DIR={os.environ['TIMM_CACHE_DIR']}")
+def _force_cpu_only() -> None:
+    # Ensure this script never depends on CUDA runtime.
+    os.environ["CUDA_VISIBLE_DEVICES"] = ""
+    os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+    try:
+        torch.set_default_device("cpu")
+    except Exception:
+        # Keep compatibility with older torch versions.
+        pass
+    print("[device] cpu-only mode enabled")
 
 
 def _set_hf_endpoint(use_hf_mirror: bool) -> None:
@@ -34,17 +25,78 @@ def _set_hf_endpoint(use_hf_mirror: bool) -> None:
         print(f"[hf] HF_ENDPOINT={os.environ['HF_ENDPOINT']}")
 
 
-def preload_timm_model(model_name: str) -> None:
-    print(f"[timm] downloading pretrained weights: {model_name}")
-    model = timm.create_model(model_name, pretrained=True)
-    del model
+def preload_swin() -> None:
+    print("[timm] preload path: swin_base_patch4_window7_224 (pretrained=True, drop_path_rate=0.2)")
+    model_ft = timm.create_model(
+        "swin_base_patch4_window7_224", pretrained=True, drop_path_rate=0.2
+    )
+    model_ft = model_ft.to("cpu")
+    # Align with model.py memory-optimized head replacement.
+    model_ft.head = nn.Sequential()
+    del model_ft
 
 
-def preload_hf_repo(repo_id: str, cache_dir: str | None) -> None:
+def preload_swinv2(input_size: tuple[int, int]) -> None:
+    print(
+        "[timm] preload path: swinv2_base_window8_256 "
+        f"(pretrained=False, img_size={input_size}, drop_path_rate=0.2) + load pretrained state"
+    )
+    model_ft = timm.create_model(
+        "swinv2_base_window8_256",
+        pretrained=False,
+        img_size=input_size,
+        drop_path_rate=0.2,
+    )
+    model_ft = model_ft.to("cpu")
+    model_full = timm.create_model("swinv2_base_window8_256", pretrained=True)
+    model_full = model_full.to("cpu")
+    model_ft.load_state_dict(model_full.state_dict(), strict=False)
+    model_ft.head = nn.Sequential()
+    del model_ft
+    del model_full
+
+
+def preload_dino(input_size: tuple[int, int]) -> None:
+    print(
+        "[timm] preload path: vit_base_patch16_dinov3.lvd1689m "
+        f"(pretrained=False, img_size={input_size}, drop_path_rate=0.2) + load pretrained state"
+    )
+    model_ft = timm.create_model(
+        "vit_base_patch16_dinov3.lvd1689m",
+        pretrained=False,
+        img_size=input_size,
+        drop_path_rate=0.2,
+    )
+    model_ft = model_ft.to("cpu")
+    model_full = timm.create_model("vit_base_patch16_dinov3.lvd1689m", pretrained=True)
+    model_full = model_full.to("cpu")
+    model_ft.load_state_dict(model_full.state_dict(), strict=False)
+    model_ft.head = nn.Sequential()
+    del model_ft
+    del model_full
+
+
+def preload_convnext() -> None:
+    print("[timm] preload path: convnext_base (pretrained=True, drop_path_rate=0.2)")
+    model_ft = timm.create_model("convnext_base", pretrained=True, drop_path_rate=0.2)
+    model_ft = model_ft.to("cpu")
+    model_ft.head = nn.Sequential()
+    del model_ft
+
+
+def preload_hrnet() -> None:
+    print("[timm] preload path: hrnet_w18 (pretrained=True)")
+    model_ft = timm.create_model("hrnet_w18", pretrained=True)
+    model_ft = model_ft.to("cpu")
+    model_ft.classifier = nn.Sequential()
+    del model_ft
+
+
+def preload_hf_repo(repo_id: str) -> None:
     print(f"[hf] snapshot_download: {repo_id}")
     from huggingface_hub import snapshot_download
 
-    snapshot_download(repo_id=repo_id, cache_dir=cache_dir)
+    snapshot_download(repo_id=repo_id)
 
 
 def parse_args() -> argparse.Namespace:
@@ -57,16 +109,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--use_convnext", action="store_true", help="preload ConvNeXt-Base")
     parser.add_argument("--use_hr", action="store_true", help="preload HRNet-W18")
     parser.add_argument(
+        "--height",
+        type=int,
+        default=256,
+        help="input height for swinv2/dino preload path to match training model construction",
+    )
+    parser.add_argument(
+        "--width",
+        type=int,
+        default=128,
+        help="input width for swinv2/dino preload path to match training model construction",
+    )
+    parser.add_argument(
         "--hf-repos",
         type=str,
         default="",
         help="extra Hugging Face repo ids to snapshot_download, comma-separated",
-    )
-    parser.add_argument(
-        "--cache-dir",
-        type=str,
-        default="",
-        help="custom cache root. Will set HF_HOME/TORCH_HOME/TIMM_CACHE_DIR under it.",
     )
     parser.add_argument(
         "--use-hf-mirror",
@@ -79,8 +137,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    cache_dir = args.cache_dir.strip() or None
-    _set_cache_env(cache_dir)
+    _force_cpu_only()
     _set_hf_endpoint(args.use_hf_mirror)
 
     targets: list[str] = []
@@ -98,12 +155,13 @@ def main() -> int:
     if not targets:
         print("[error] no backbone selected.")
         print(
-            "Please pass at least one flag, e.g. --use_swin or "
-            "--use_resnet50 --use_dense"
+            "Please pass at least one flag, e.g. --use_swin or --use_dino"
         )
         return 2
 
+    input_size = (args.height, args.width)
     print(f"[run] models={targets}")
+    print(f"[run] input_size={input_size}")
     if args.hf_repos.strip():
         print(f"[run] extra hf repos={args.hf_repos}")
 
@@ -111,10 +169,16 @@ def main() -> int:
 
     for target in targets:
         try:
-            if target in TIMM_BACKBONES:
-                preload_timm_model(TIMM_BACKBONES[target])
-            else:
-                print(f"[skip] unknown target: {target}")
+            if target == "swin":
+                preload_swin()
+            elif target == "swinv2":
+                preload_swinv2(input_size)
+            elif target == "dino":
+                preload_dino(input_size)
+            elif target == "convnext":
+                preload_convnext()
+            elif target == "hrnet":
+                preload_hrnet()
         except Exception:
             failed.append(target)
             print(f"[error] failed target: {target}")
@@ -123,7 +187,7 @@ def main() -> int:
     extra_repos = [x.strip() for x in args.hf_repos.split(",") if x.strip()]
     for repo_id in extra_repos:
         try:
-            preload_hf_repo(repo_id, cache_dir)
+            preload_hf_repo(repo_id)
         except Exception:
             failed.append(f"hf:{repo_id}")
             print(f"[error] failed hf repo: {repo_id}")

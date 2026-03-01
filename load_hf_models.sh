@@ -77,8 +77,8 @@ confirmer() {
   done
 }
 
-if [[ ! -f "preload_models.py" ]]; then
-  echo "Missing file: preload_models.py"
+if [[ ! -f "load_hf_models.py" ]]; then
+  echo "Missing file: load_hf_models.py"
   exit 1
 fi
 
@@ -109,14 +109,14 @@ esac
 
 use_hf_mirror="$(confirmer "Use Hugging Face mirror (https://hf-mirror.com)?" "yes")"
 
-read -r -p "Custom cache dir (optional, press Enter to skip): " cache_dir
+read -r -p "Input height for SwinV2/DINO [256]: " input_h
+read -r -p "Input width for SwinV2/DINO [128]: " input_w
+input_h="${input_h:-256}"
+input_w="${input_w:-128}"
 
-cmd=(python preload_models.py "${backbone_flags[@]}")
+cmd=(python load_hf_models.py "${backbone_flags[@]}" --height "$input_h" --width "$input_w")
 if [[ "$use_hf_mirror" == "Y" ]]; then
   cmd+=(--use-hf-mirror)
-fi
-if [[ -n "${cache_dir}" ]]; then
-  cmd+=(--cache-dir "$cache_dir")
 fi
 
 echo
