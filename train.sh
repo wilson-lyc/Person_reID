@@ -82,6 +82,14 @@ confirmer() {
   local answer
   local prompt_suffix=""
   local default_answer=""
+  local color_selected=""
+  local color_reset=""
+  local shown_answer=""
+
+  if [[ -t 1 ]]; then
+    color_selected="\033[1;36m"
+    color_reset="\033[0m"
+  fi
 
   case "$default_choice" in
     yes)
@@ -103,6 +111,15 @@ confirmer() {
     answer="${answer:-$default_answer}"
     case "$answer" in
       Y|n)
+        if [[ -t 1 ]]; then
+          if [[ "$answer" == "Y" ]]; then
+            shown_answer="Y"
+          else
+            shown_answer="N"
+          fi
+          printf "\033[1A\r\033[2K" >&2
+          printf "%s: %b%s%b\n" "$prompt" "$color_selected" "$shown_answer" "$color_reset" >&2
+        fi
         printf '%s\n' "$answer"
         return 0
         ;;
