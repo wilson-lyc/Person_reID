@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 #from PIL import Image
 import time
 import os
-import collections
+
 from torch.optim import swa_utils
 from tqdm import tqdm
 from model import ft_net, ft_net_dense, ft_net_hr, ft_net_swin, ft_net_swinv2, ft_net_dino, ft_net_convnext, ft_net_efficient, ft_net_NAS, PCB
@@ -228,6 +228,11 @@ def format_duration(seconds):
         return f"{hrs:02d}:{mins:02d}:{sec:02d}"
     return f"{mins:02d}:{sec:02d}"
 
+
+def format_epoch_tag(epoch_idx, total_epochs):
+    width = max(2, len(str(total_epochs)))
+    return f"Epoch {epoch_idx + 1:0{width}d}/{total_epochs:0{width}d}"
+
 def fliplr(img):
     '''flip horizontal'''
     inv_idx = torch.arange(img.size(3)-1,-1,-1).long().cuda()  # N x C x H x W
@@ -328,7 +333,8 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
     for epoch in range(num_epochs):
         epoch_start = time.time()
         epoch_stats = {}
-        print(f"epoch {epoch + 1}/{num_epochs}")
+        epoch_tag = format_epoch_tag(epoch, num_epochs)
+        print(f"\n[{epoch_tag}]")
 
         if opt.wa and wa_flag and epoch >=  num_epochs*0.8:
             wa_flag = False
@@ -346,10 +352,13 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
             # Keep batch feedback in tqdm; use compact epoch summary after each epoch.
             pbar = tqdm(
                 total=len(dataloaders[phase]),
-                desc=phase,
+                desc=f"{epoch_tag} [{phase}]",
                 leave=True,
+                dynamic_ncols=True,
+                bar_format="{desc:<26} {percentage:3.0f}%|{bar:24}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]",
             )
-            ordered_dict = collections.OrderedDict(Loss="", Acc="")
+            batch_loss = 0.0
+            batch_acc = 0.0
 
             running_loss = 0.0
             running_corrects = 0.0
@@ -499,26 +508,22 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
                 # statistics
                 if int(version[0])>0 or int(version[2]) > 3: # for the new version like 0.4.0, 0.5.0 and 1.0.0
                     running_loss += loss.item() * now_batch_size
-                    ordered_dict["Loss"] = f"{loss.item():.4f}"
+                    batch_loss = float(loss.item())
                 else :  # for the old version like 0.3.0 and 0.3.1
                     running_loss += loss.data[0] * now_batch_size
-                    ordered_dict["Loss"] = f"{loss.data[0]:.4f}"
+                    batch_loss = float(loss.data[0])
                 del loss
                 running_corrects += float(torch.sum(preds == labels.data))
                 # Refresh the progress bar in every batch
-                ordered_dict[
-                    "Acc"
-                ] = f"{(float(torch.sum(preds == labels.data)) / now_batch_size):.4f}"
-                pbar.set_postfix(ordered_dict=ordered_dict)
+                batch_acc = float(torch.sum(preds == labels.data)) / now_batch_size
+                pbar.set_postfix_str(f"loss={batch_loss:.4f}, acc={batch_acc:.4f}")
 
             epoch_loss = running_loss / dataset_sizes[phase]
             epoch_acc = running_corrects / dataset_sizes[phase]
             
             # print('{} Loss: {:.4f} Acc: {:.4f}'.format(
             #     phase, epoch_loss, epoch_acc))
-            ordered_dict["Loss"] = f"{epoch_loss:.4f}"
-            ordered_dict["Acc"] = f"{epoch_acc:.4f}"
-            pbar.set_postfix(ordered_dict=ordered_dict)
+            pbar.set_postfix_str(f"loss={epoch_loss:.4f}, acc={epoch_acc:.4f}")
             pbar.close()
             
             if phase == 'train' and opt.wa and epoch >= num_epochs*0.8: 
@@ -547,10 +552,11 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
         train_stat = epoch_stats.get('train', {})
         val_stat = epoch_stats.get('val', {})
         print(
-            f"elapsed={format_duration(epoch_elapsed)} | "
-            f"lr={current_lr:.6f} | "
-            f"train_loss={train_stat.get('loss', 0.0):.4f} train_acc={train_stat.get('acc', 0.0):.4f} | "
-            f"val_loss={val_stat.get('loss', 0.0):.4f} val_acc={val_stat.get('acc', 0.0):.4f} | "
+            f"[{epoch_tag}] "
+            f"time={format_duration(epoch_elapsed)}  "
+            f"lr={current_lr:.6f}  "
+            f"train(loss/acc)={train_stat.get('loss', 0.0):.4f}/{train_stat.get('acc', 0.0):.4f}  "
+            f"val(loss/acc)={val_stat.get('loss', 0.0):.4f}/{val_stat.get('acc', 0.0):.4f}  "
             f"best_val_acc={best_val_acc:.4f}"
         )
         lark_log(
