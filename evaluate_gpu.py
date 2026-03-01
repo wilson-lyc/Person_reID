@@ -64,7 +64,7 @@ def compute_mAP(index, good_index, junk_index):
 ######################################################################
 result = scipy.io.loadmat('pytorch_result.mat')
 since = time.time()
-print(f"Evaluation Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+print(f"Evaluated at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 query_feature = torch.FloatTensor(result['query_f'])
 query_cam = result['query_cam'][0]
 query_label = result['query_label'][0]
