@@ -391,4 +391,5 @@ fi
 echo "[2/3] Evaluating..."
 python "$eval_script" | tee -a "$result_file"
 
-echo "Done! Results have been saved: ${result_file}"
+echo "Evaluation complete"
+echo "Results have been appended to: ${result_file}"
