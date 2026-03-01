@@ -274,7 +274,6 @@ default_test_dir="./data/Market/pytorch"
 default_dataset_choice="1"
 if parsed_test_dir="$(extract_data_dir_from_opts "$opts_file")"; then
   default_test_dir="$parsed_test_dir"
-  echo "Detected test_dir from opts.yaml: ${default_test_dir}"
 fi
 
 case "$default_test_dir" in
@@ -288,7 +287,7 @@ case "$default_test_dir" in
   *) default_dataset_choice="1" ;;
 esac
 
-select_menu dataset_choice "Select Dataset:" "$default_dataset_choice" \
+select_menu dataset_choice "Select Evaluation Dataset:" "$default_dataset_choice" \
   "Market-1501 (default)" \
   "DukeMTMC-reID" \
   "MSMT17" \
