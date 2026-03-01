@@ -2,6 +2,7 @@
 outputs/
 .vscode/
 model/*
+data/*
 logs/
 __pycache__/
 core
