@@ -256,25 +256,29 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
     if opt.sphere:
         criterion_sphere = losses.SphereFaceLoss(num_classes=opt.nclasses, embedding_size=embedding_size, margin=4)
 
-    backbone = "resnet50"
+    backbone = "ResNet50"
     if opt.PCB:
-        backbone = "PCB"
+        backbone = "PCB (ResNet50+PCB)"
+    elif opt.ibn:
+        backbone = "ResNet50-IBN"
+    elif opt.usam:
+        backbone = "ResNet50-USAM"
     elif opt.use_dense:
-        backbone = "densenet121"
+        backbone = "DenseNet121"
     elif opt.use_swin:
-        backbone = "swin"
+        backbone = "Swin"
     elif opt.use_swinv2:
-        backbone = "swinv2"
+        backbone = "SwinV2"
     elif opt.use_dino:
-        backbone = "dino"
+        backbone = "DINOv3"
     elif opt.use_efficient:
-        backbone = "efficientnet-b4"
+        backbone = "EfficientNet-B4"
     elif opt.use_NAS:
         backbone = "NAS"
     elif opt.use_hr:
-        backbone = "hrnet"
+        backbone = "HRNet"
     elif opt.use_convnext:
-        backbone = "convnext"
+        backbone = "ConvNeXt"
 
     lark_notify(
         title=f"[Train Start] {name}",
@@ -471,7 +475,6 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
                 if epoch<opt.warm_epoch and phase == 'train': 
                     warm_up = min(1.0, warm_up + 0.9 / warm_iteration)
                     loss = loss*warm_up
-                    print(loss, warm_up)
 
                 if phase == 'train':
                     if bf16 or fp16: # we use optimier to backward loss

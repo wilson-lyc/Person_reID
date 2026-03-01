@@ -393,7 +393,6 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                 if epoch<opt.warm_epoch and phase == 'train': 
                     warm_up = min(1.0, warm_up + 0.9 / warm_iteration)
                     loss = loss*warm_up
-                    print(loss, warm_up)
 
                 if phase == 'train':
                     if fp16: # we use optimier to backward loss
