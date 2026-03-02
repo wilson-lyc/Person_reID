@@ -189,6 +189,7 @@ ui_select() {
   local key=""
   local esc_tail=""
   local input_choice=""
+  local display_label="$title"
   local page_size=8
   local start=0
   local end=0
@@ -205,6 +206,18 @@ ui_select() {
     return 1
   fi
   selected_idx=$((default_index - 1))
+
+  if [[ "$display_label" =~ ^[[:space:]]*[Ss]elect[[:space:]]+(.+)$ ]]; then
+    display_label="${BASH_REMATCH[1]}"
+  elif [[ "$display_label" =~ ^[[:space:]]*[Cc]hoose[[:space:]]+(.+)$ ]]; then
+    display_label="${BASH_REMATCH[1]}"
+  fi
+  display_label="${display_label%%:}"
+  display_label="${display_label#"${display_label%%[![:space:]]*}"}"
+  display_label="${display_label%"${display_label##*[![:space:]]}"}"
+  if [[ -z "$display_label" ]]; then
+    display_label="Selection"
+  fi
 
   if [[ -t 0 && -t 1 ]]; then
     tty_mode=1
@@ -378,15 +391,15 @@ ui_select() {
       ui_warn "Operation canceled."
       return 130
     fi
-    if ui_use_color; then
-      printf "\033[1;36m%s\033[0m\n" "${options[$selected_idx]}"
-    else
-      printf "%s\n" "${options[$selected_idx]}"
-    fi
   fi
 
   UI_SELECT_INDEX=$((selected_idx + 1))
   UI_SELECT_VALUE="${options[$selected_idx]}"
+  if ui_use_color; then
+    printf "\033[1;36m%s:\033[0m %s\n" "$display_label" "$UI_SELECT_VALUE"
+  else
+    printf "%s: %s\n" "$display_label" "$UI_SELECT_VALUE"
+  fi
   printf -v "$__out_idx_var" '%s' "$UI_SELECT_INDEX"
   printf -v "$__out_val_var" '%s' "$UI_SELECT_VALUE"
 }
