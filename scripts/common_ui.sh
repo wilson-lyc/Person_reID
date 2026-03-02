@@ -285,6 +285,8 @@ ui_select() {
     #   Rewrites selector block in-place without clearing full screen.
     _ui_select_draw() {
       _ui_select_clear_block
+      # Reset terminal attributes before each draw to avoid style bleed.
+      printf '\033[0m'
 
       printf "%s\n" "$title"
       draw_lines=$((draw_lines + 1))
@@ -298,12 +300,12 @@ ui_select() {
         fi
         if (( idx == selected_idx )); then
           if ui_use_color; then
-            printf "\033[1;34m> %s\033[0m\n" "$display_text"
+            printf "\033[0m\033[1;34m> %s\033[0m\n" "$display_text"
           else
             printf "> %s\n" "$display_text"
           fi
         else
-          printf "  %s\n" "$display_text"
+          printf "\033[0m  %s\n" "$display_text"
         fi
         draw_lines=$((draw_lines + 1))
       done
@@ -322,6 +324,7 @@ ui_select() {
         tput cnorm 2>/dev/null || true
       fi
       _ui_select_clear_block
+      printf '\033[0m'
     }
 
     # Purpose:
