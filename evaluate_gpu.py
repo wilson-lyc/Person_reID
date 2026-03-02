@@ -3,6 +3,7 @@ import torch
 import numpy as np
 import time
 import os
+from datetime import datetime
 
 #######################################################################
 # Evaluate
@@ -63,6 +64,7 @@ def compute_mAP(index, good_index, junk_index):
 ######################################################################
 result = scipy.io.loadmat('pytorch_result.mat')
 since = time.time()
+print(f"Evaluated at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 query_feature = torch.FloatTensor(result['query_f'])
 query_cam = result['query_cam'][0]
 query_label = result['query_label'][0]
@@ -131,3 +133,4 @@ if multi:
 
 time_elapsed = time.time() - since
 print('Evaluation complete in {:.0f}m {:.2f}s'.format(time_elapsed // 60, time_elapsed % 60))
+print()
