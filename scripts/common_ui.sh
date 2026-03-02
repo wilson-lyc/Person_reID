@@ -233,9 +233,9 @@ ui_select() {
   else
     local term_lines
     local has_tput=0
-    local use_alt_screen=0
     local canceled=0
     local interrupted=0
+    local draw_lines=0
     local idx
     if command -v tput >/dev/null 2>&1; then
       has_tput=1
@@ -252,19 +252,31 @@ ui_select() {
     fi
 
     # Purpose:
+    #   Move cursor up and clear previously rendered selector block.
+    # Side Effects:
+    #   Touches only the selector output block, keeps previous logs visible.
+    _ui_select_clear_block() {
+      local n
+      if (( draw_lines <= 0 )); then
+        return
+      fi
+      for ((n = 0; n < draw_lines; n++)); do
+        printf '\033[1A\r\033[2K'
+      done
+      draw_lines=0
+    }
+
+    # Purpose:
     #   Render current selector page in interactive TTY mode.
     # Side Effects:
-    #   Clears screen region and prints title/options/page info.
+    #   Rewrites selector block in-place without clearing full screen.
     _ui_select_draw() {
-      if (( has_tput == 1 )); then
-        tput cup 0 0 2>/dev/null || true
-        tput ed 2>/dev/null || true
-      else
-        clear
-      fi
+      _ui_select_clear_block
 
       printf "%s\n" "$title"
+      draw_lines=$((draw_lines + 1))
       printf "  (Up/Down or k/j, Enter confirm, q cancel)\n"
+      draw_lines=$((draw_lines + 1))
       local display_text
       for ((idx = start; idx <= end; idx++)); do
         display_text="${options[$idx]}"
@@ -280,23 +292,23 @@ ui_select() {
         else
           printf "  %s\n" "$display_text"
         fi
+        draw_lines=$((draw_lines + 1))
       done
       if (( ${#options[@]} > page_size )); then
         printf "  [%d-%d / %d]\n" "$((start + 1))" "$((end + 1))" "${#options[@]}"
+        draw_lines=$((draw_lines + 1))
       fi
     }
 
     # Purpose:
     #   Restore terminal state after interactive selector.
     # Side Effects:
-    #   Re-enables cursor and exits alt screen when enabled.
+    #   Re-enables cursor.
     _ui_select_restore() {
       if (( has_tput == 1 )); then
         tput cnorm 2>/dev/null || true
-        if (( use_alt_screen == 1 )); then
-          tput rmcup 2>/dev/null || true
-        fi
       fi
+      _ui_select_clear_block
     }
 
     # Purpose:
@@ -311,7 +323,6 @@ ui_select() {
     }
 
     if (( has_tput == 1 )); then
-      tput smcup 2>/dev/null && use_alt_screen=1 || use_alt_screen=0
       tput civis 2>/dev/null || true
     fi
     trap '_ui_select_on_interrupt' INT TERM
@@ -367,20 +378,10 @@ ui_select() {
       ui_warn "Operation canceled."
       return 130
     fi
-    if (( use_alt_screen == 0 )); then
-      # Notes:
-      #   Clear selector menu first, then print the final selected value.
-      if (( has_tput == 1 )); then
-        tput cup 0 0 2>/dev/null || true
-        tput ed 2>/dev/null || true
-      else
-        clear
-      fi
-      if ui_use_color; then
-        printf "\033[1;36m%s\033[0m\n" "${options[$selected_idx]}"
-      else
-        printf "%s\n" "${options[$selected_idx]}"
-      fi
+    if ui_use_color; then
+      printf "\033[1;36m%s\033[0m\n" "${options[$selected_idx]}"
+    else
+      printf "%s\n" "${options[$selected_idx]}"
     fi
   fi
 
