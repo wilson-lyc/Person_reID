@@ -328,28 +328,39 @@ case "$loss_choice" in
     ;;
 esac
 
+# warm epoch
 default_warm_epoch="5"
 ui_input warm_epoch "warm_epoch" "$default_warm_epoch" '^[0-9]+$' "" "Invalid warm_epoch: please enter a non-negative integer."
 
+# stride
 default_stride="2"
 ui_input stride "stride" "$default_stride" '^[1-9][0-9]*$' "" "Invalid stride: please enter a positive integer."
 
+# erasing_p
 erasing_p="0"
 ui_input erasing_p "erasing_p" "0" '^([0-9]+([.][0-9]+)?|[.][0-9]+)$' "v >= 0 && v <= 1" "Invalid erasing_p: please enter a number in [0, 1]."
+
+# color_jitter
 color_jitter="no"
 ui_yes_no color_jitter "color_jitter" "2"
 
+# batchsize
 default_batchsize="32"
-default_lr="0.05"
-
 ui_input batchsize "batchsize" "$default_batchsize" '^[1-9][0-9]*$' "" "Invalid batchsize: please enter a positive integer."
+
+# learning rate
+default_lr="0.05"
 ui_input lr "lr" "$default_lr" '^([0-9]+([.][0-9]+)?|[.][0-9]+)$' "v > 0" "Invalid lr: please enter a positive number."
 
+# gpu ids
 gpu_ids="0"
 ui_input gpu_ids "gpu_ids" "$gpu_ids"
 
-ui_input which_epoch "which_epoch" "last"
+# which epoch for testing
+which_epoc="last"
+ui_input which_epoch "which_epoch" "$which_epoc"
 
+# run name
 run_id="$(python tool/run_id.py)"
 lr_tag="${lr//./p}"
 erasing_tag="${erasing_p//./p}"

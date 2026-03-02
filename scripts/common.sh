@@ -6,7 +6,7 @@
 # Result:
 #   - Writes selected option text into variable named by out_var.
 #   - Exports SELECTOR_INDEX (1-based) and SELECTOR_VALUE.
-#   - Prints confirmation line: Question: <selected value in color>
+#   - Prints confirmation line with selected value.
 selector() {
   local __outvar="$1"
   local question="$2"
@@ -17,9 +17,6 @@ selector() {
   local selected_value=""
   local key=""
   local esc_tail=""
-  local color_choice=""
-  local color_value=""
-  local color_reset=""
   local rendered_lines=0
   local rendered_once=0
 
@@ -34,12 +31,6 @@ selector() {
   fi
 
   selected_idx=$((default_index - 1))
-
-  if [[ -t 1 ]]; then
-    color_choice="\033[1;36m"
-    color_value="\033[1;36m"
-    color_reset="\033[0m"
-  fi
 
   if [[ ! -t 0 ]]; then
     local input_choice=""
@@ -67,7 +58,7 @@ selector() {
       local idx
       for idx in "${!choices[@]}"; do
         if (( idx == selected_idx )); then
-          printf "%b> %s%b\n" "$color_choice" "${choices[$idx]}" "$color_reset"
+          printf "> %s\n" "${choices[$idx]}"
         else
           printf "  %s\n" "${choices[$idx]}"
         fi
@@ -109,7 +100,7 @@ selector() {
     # Remove selector-rendered block first, then echo final selected value.
     printf "\r\033[%dA\033[J" "$rendered_lines"
     # Echo the final selected value after confirming with Enter.
-    printf "%b%s%b\n" "$color_value" "$selected_value" "$color_reset"
+    printf "%s\n" "$selected_value"
   fi
   return 0
 }
