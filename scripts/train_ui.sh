@@ -337,7 +337,7 @@ ui_input stride "stride" "$default_stride" '^[1-9][0-9]*$' "" "Invalid stride: p
 erasing_p="0"
 ui_input erasing_p "erasing_p" "0" '^([0-9]+([.][0-9]+)?|[.][0-9]+)$' "v >= 0 && v <= 1" "Invalid erasing_p: please enter a number in [0, 1]."
 color_jitter="no"
-ui_yes_no color_jitter "Enable color_jitter?" "2"
+ui_yes_no color_jitter "color_jitter" "2"
 
 default_batchsize="32"
 default_lr="0.05"
