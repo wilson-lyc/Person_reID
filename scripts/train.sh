@@ -5,88 +5,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "$REPO_ROOT"
 
-COMMON_LIB="${SCRIPT_DIR}/common.sh"
-if [[ ! -f "$COMMON_LIB" ]]; then
-  echo "Missing shared shell library: ${COMMON_LIB}"
+COMMON_UI_LIB="${SCRIPT_DIR}/common_ui.sh"
+if [[ ! -f "$COMMON_UI_LIB" ]]; then
+  echo "Missing global UI library: ${COMMON_UI_LIB}"
   exit 1
 fi
-source "$COMMON_LIB"
+source "$COMMON_UI_LIB"
 
-# Copyright:
-# Script built by Wilson: https://github.com/wilson-lyc
-# Co-developed with Codex (OpenAI)
-# Project codebase: https://github.com/layumi/Person_reID_baseline_pytorch
-
-# =========================
-# UI Tools
-# =========================
-print_banner() {
-cat <<'EOF'
-██████╗ ███████╗██████╗ ███████╗ ██████╗ ███╗   ██╗    ██████╗ ███████╗██╗██████╗
-██╔══██╗██╔════╝██╔══██╗██╔════╝██╔═══██╗████╗  ██║    ██╔══██╗██╔════╝██║██╔══██╗
-██████╔╝█████╗  ██████╔╝███████╗██║   ██║██╔██╗ ██║    ██████╔╝█████╗  ██║██║  ██║
-██╔═══╝ ██╔══╝  ██╔══██╗╚════██║██║   ██║██║╚██╗██║    ██╔══██╗██╔══╝  ██║██║  ██║
-██║     ███████╗██║  ██║███████║╚██████╔╝██║ ╚████║    ██║  ██║███████╗██║██████╔╝
-╚═╝     ╚══════╝╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═╝  ╚═══╝    ╚═╝  ╚═╝╚══════╝╚═╝╚═════╝
-EOF
-  local script_name
-  script_name="$(basename "$0")"
-  echo "============================================================"
-  echo "Designed by Wilson | Implemented by Codex"
-  echo "Script: ${script_name}"
-  echo "============================================================"
-}
-
-# Parameter inputer
-inputer() {
-  local __outvar="$1"
-  local label="$2"
-  local default_value="$3"
-  local regex="${4:-}"
-  local range_expr="${5:-}"
-  local err_msg="${6:-Invalid input.}"
-  local value=""
-  local ok=1
-  local color_selected=""
-  local color_reset=""
-
-  if [[ -t 1 ]]; then
-    color_selected="\033[1;36m"
-    color_reset="\033[0m"
-  fi
-
-  while true; do
-    read -r -p "${label} [${default_value}]: " value
-    value="${value:-$default_value}"
-    ok=1
-
-    if [[ -n "$regex" ]] && [[ ! "$value" =~ $regex ]]; then
-      ok=0
-    fi
-    if [[ $ok -eq 1 && -n "$range_expr" ]] && ! awk -v v="$value" "BEGIN {exit !($range_expr)}"; then
-      ok=0
-    fi
-
-    if [[ $ok -eq 1 ]]; then
-      break
-    fi
-    echo "$err_msg"
-  done
-
-  if [[ -t 1 ]]; then
-    printf "\033[1A\r\033[2K"
-    printf "%s: %b%s%b\n" "$label" "$color_selected" "$value" "$color_reset"
-  else
-    echo "${label}: ${value}"
-  fi
-
-  printf -v "$__outvar" '%s' "$value"
-}
-
-# Mirror config status shown in run confirmation.
-HF_MIRROR_STATUS="N/A"
-IBN_MIRROR_STATUS="N/A"
-IBN_DOWNLOAD_SOURCE="direct"
+CURRENT_SCRIPT="$(basename "$0")"
 
 # =========================
 # Dataset preparation
@@ -94,21 +20,12 @@ IBN_DOWNLOAD_SOURCE="direct"
 print_manual_dataset_tutorial() {
   local ds_name="$1"
   local raw_dir="$2"
-  local prepared_dir="$3"
-
-  echo
-  echo "================ MANUAL DATASET PREPARATION GUIDE ================"
-  echo "[Dataset] ${ds_name}"
-  echo "Raw path should be: ${raw_dir}"
-  echo "Please prepare the raw dataset folders/files under the path above."
-  echo "Expected prepared path:"
-  echo "  ${prepared_dir}"
-  echo "After raw data is ready, rerun train.sh."
-  echo "=================================================================="
-  echo
+  echo "1. Download the ${ds_name} dataset from internet."
+  echo "2. Place the downloaded dataset at: ${raw_dir}"
+  echo "3. Rerun this script after dataset is ready."
 }
 
-dataset_has_required_structure() {
+check_dataset_structure() {
   local ds_name="$1"
   local path="$2"
 
@@ -144,36 +61,32 @@ dataset_has_required_structure() {
   esac
 }
 
-ensure_dataset_ready() {
+prepare_dataset() {
   local ds_name="$1"
   local raw_dir="$2"
   local prepared_dir="$3"
   local prepare_script="$4"
 
   if [[ ! -f "$prepare_script" ]]; then
-    echo "Prepare script not found: ${prepare_script}"
-    echo "Please check your project files, then rerun train.sh."
+    ui_error "${prepare_script} was not found. Please check your project files, then rerun this script."
     return 1
   fi
 
-  if ! dataset_has_required_structure "$ds_name" "$raw_dir"; then
-    echo "Dataset raw path not found or incomplete: ${raw_dir}"
-    echo "Please prepare this dataset manually according to its required raw folder/files."
-    print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir"
-    echo "After preparing the dataset, rerun train.sh."
+  if ! check_dataset_structure "$ds_name" "$raw_dir"; then
+    ui_error "${ds_name} was not found or has unexpected structure. Please follow the instructions to prepare it."
+    print_manual_dataset_tutorial "$ds_name" "$raw_dir"
+    ui_tip "After preparing the dataset, rerun ${CURRENT_SCRIPT}."
     return 1
   fi
 
-  echo "Preparing dataset..."
+  ui_info "Preparing dataset..."
   if ! python "$prepare_script" --path "$raw_dir"; then
-    echo "Prepare failed."
-    print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir"
+    ui_error "Dataset preparation failed. Error while running ${prepare_script}."
     return 1
   fi
 
   if [[ ! -d "$prepared_dir" ]]; then
-    echo "Prepared path not found after prepare: ${prepared_dir}"
-    print_manual_dataset_tutorial "$ds_name" "$raw_dir" "$prepared_dir"
+    ui_error "Dataset preparation failed. Target directory ${prepared_dir} was not found."
     return 1
   fi
 
@@ -181,51 +94,44 @@ ensure_dataset_ready() {
 }
 
 # =========================
-# Network / model source config
+# Mirror configuration
 # =========================
+HF_MIRROR_STATUS="no"
+IBN_MIRROR_STATUS="no"
+IBN_DOWNLOAD_SOURCE="direct"
+
 mirror_config_hf() {
   local selected_backbone="$1"
   local backbone_tip
-  local use_hf_mirror
+  local use_hf_mirror="no"
 
   case "$selected_backbone" in
-    hrnet)
-      backbone_tip="HRNet"
-      ;;
-    convnext)
-      backbone_tip="ConvNeXt"
-      ;;
-    swin)
-      backbone_tip="Swin"
-      ;;
-    swinv2)
-      backbone_tip="SwinV2"
-      ;;
+    hrnet)    backbone_tip="HRNet" ;;
+    convnext) backbone_tip="ConvNeXt" ;;
+    swin)     backbone_tip="Swin" ;;
+    swinv2)   backbone_tip="SwinV2" ;;
+    dino)     backbone_tip="DINOv3" ;;
     *)
-      HF_MIRROR_STATUS="N/A"
+      HF_MIRROR_STATUS="no"
       return 0
       ;;
   esac
 
-  if [[ -n "${HF_ENDPOINT:-}" ]]; then
-    echo "Current HF_ENDPOINT: ${HF_ENDPOINT}"
-  fi
+  [[ -n "${HF_ENDPOINT:-}" ]] && ui_info "Current HF_ENDPOINT: ${HF_ENDPOINT}"
 
-  use_hf_mirror="$(confirmer "${backbone_tip} may download weights from Hugging Face. Use mirror (https://hf-mirror.com)?" "y")"
-  case "$use_hf_mirror" in
-    y)
-      export HF_ENDPOINT="https://hf-mirror.com"
-      HF_MIRROR_STATUS="enabled"
-      echo "Using mirror endpoint: ${HF_ENDPOINT}"
-      ;;
-    n)
-      if [[ -n "${HF_ENDPOINT:-}" ]]; then
-        unset HF_ENDPOINT
-      fi
-      HF_MIRROR_STATUS="disabled"
-      echo "Using direct Hugging Face endpoint."
-      ;;
-  esac
+  ui_yes_no use_hf_mirror \
+    "${backbone_tip} may download weights from Hugging Face. Use mirror (https://hf-mirror.com)?" \
+    "1"
+
+  if [[ "$use_hf_mirror" == "yes" ]]; then
+    export HF_ENDPOINT="https://hf-mirror.com"
+    HF_MIRROR_STATUS="yes"
+    ui_info "Using mirror endpoint: ${HF_ENDPOINT}"
+  else
+    unset HF_ENDPOINT 2>/dev/null
+    HF_MIRROR_STATUS="no"
+    ui_info "Using direct Hugging Face endpoint."
+  fi
 }
 
 is_ibn_backbone() {
@@ -235,28 +141,25 @@ is_ibn_backbone() {
 
 mirror_config_ibn() {
   local selected_backbone="$1"
-  local use_mirror_confirm
+  local use_mirror="no"
 
   if ! is_ibn_backbone "$selected_backbone"; then
-    IBN_MIRROR_STATUS="N/A"
+    IBN_MIRROR_STATUS="no"
     IBN_DOWNLOAD_SOURCE="direct"
     return 0
   fi
 
-  use_mirror_confirm="$(confirmer "Use mirror URL for IBN checkpoint download?" "y")"
-  case "$use_mirror_confirm" in
-    y)
-      IBN_DOWNLOAD_SOURCE="mirror"
-      IBN_MIRROR_STATUS="enabled"
-      ;;
-    n)
-      IBN_DOWNLOAD_SOURCE="direct"
-      IBN_MIRROR_STATUS="disabled"
-      ;;
-  esac
+  ui_yes_no use_mirror "Use mirror URL for IBN checkpoint download?" "1"
+  if [[ "$use_mirror" == "yes" ]]; then
+    IBN_DOWNLOAD_SOURCE="mirror"
+    IBN_MIRROR_STATUS="yes"
+  else
+    IBN_DOWNLOAD_SOURCE="direct"
+    IBN_MIRROR_STATUS="no"
+  fi
 }
 
-ensure_ibn_checkpoint() {
+download_ibn_backbone() {
   local selected_backbone="$1"
   if ! is_ibn_backbone "$selected_backbone"; then
     return 0
@@ -272,16 +175,14 @@ ensure_ibn_checkpoint() {
   local download_source="${IBN_DOWNLOAD_SOURCE:-direct}"
 
   if [[ -s "$checkpoint_path" ]]; then
-    echo "IBN checkpoint already exists: ${checkpoint_path}"
+    ui_info "IBN checkpoint already exists: ${checkpoint_path}"
     return 0
   fi
 
-  echo "ResNet50-IBN selected. Ensuring checkpoint:"
-  echo "  ${checkpoint_path}"
+  ui_info "ResNet50-IBN selected. Ensuring checkpoint: ${checkpoint_path}"
   if ! mkdir -p "$checkpoint_dir"; then
-    echo "Failed to create checkpoint directory: ${checkpoint_dir}"
-    echo "Please manually place checkpoint at:"
-    echo "  ${checkpoint_path}"
+    ui_error "Failed to create checkpoint directory: ${checkpoint_dir}"
+    ui_tip "Please manually place checkpoint at: ${checkpoint_path}"
     return 1
   fi
 
@@ -293,36 +194,34 @@ ensure_ibn_checkpoint() {
   fi
 
   rm -f "$tmp_path"
-  echo "Downloading IBN checkpoint via ${download_source} URL..."
+  ui_info "Downloading IBN checkpoint via ${download_source} URL..."
   if command -v curl >/dev/null 2>&1; then
     # Show progress with curl when available.
     if curl -L --fail --progress-bar "$download_url" -o "$tmp_path"; then
       mv "$tmp_path" "$checkpoint_path"
-      echo "IBN checkpoint downloaded from ${download_source} URL."
+      ui_success "IBN checkpoint downloaded from ${download_source} URL."
       return 0
     fi
   elif command -v wget >/dev/null 2>&1; then
     # Fallback with wget progress display.
     if wget -O "$tmp_path" "$download_url"; then
       mv "$tmp_path" "$checkpoint_path"
-      echo "IBN checkpoint downloaded from ${download_source} URL."
+      ui_success "IBN checkpoint downloaded from ${download_source} URL."
       return 0
     fi
   else
-    echo "No curl/wget available. Skip auto-download."
+    ui_warn "No curl/wget available. Skip auto-download."
   fi
 
   rm -f "$tmp_path"
-  echo "Failed to download IBN checkpoint automatically."
-  echo "Please download it manually and place file at:"
-  echo "  ${checkpoint_path}"
-  echo "Preferred URL (${download_source}):"
-  echo "  ${download_url}"
-  echo "Alternative URL:"
+  ui_error "Failed to download IBN checkpoint automatically."
+  ui_tip "Please download it manually and place file at: ${checkpoint_path}"
+  ui_tip "Preferred URL (${download_source}): ${download_url}"
+  ui_tip "Alternative URL:"
   if [[ "$download_source" == "mirror" ]]; then
-    echo "  ${direct_url}"
+    ui_tip "${direct_url}"
   else
-    echo "  ${mirror_url}"
+    ui_tip "${mirror_url}"
   fi
   return 1
 }
@@ -331,11 +230,13 @@ ensure_ibn_checkpoint() {
 # Interactive configuration
 # =========================
 clear
-print_banner
+ui_banner "$CURRENT_SCRIPT"
 
 # Backbone selection
-select_menu backbone_choice "Select Backbone:" "1" \
-  "ResNet50 (baseline)" \
+backbone_choice=""
+backbone_label=""
+ui_select backbone_choice backbone_label "Select Backbone:" "1" \
+  "ResNet50" \
   "ResNet50 + IBN" \
   "ResNet50 + PCB" \
   "ResNet50 + USAM" \
@@ -346,8 +247,8 @@ select_menu backbone_choice "Select Backbone:" "1" \
   "SwinV2" \
   "DINOv3" \
   "EfficientNet-B4" \
-  "NAS" \
-  
+  "NAS"
+
 case "$backbone_choice" in
   1) backbone="resnet"; backbone_flags=() ;;
   2) backbone="resnet_ibn"; backbone_flags=(--ibn) ;;
@@ -362,14 +263,16 @@ case "$backbone_choice" in
   11) backbone="efficientnet"; backbone_flags=(--use_efficient) ;;
   12) backbone="nas"; backbone_flags=(--use_NAS) ;;
   *)
-    echo "Invalid backbone number: $backbone_choice"
+    ui_error "Invalid backbone number: $backbone_choice"
     exit 1
     ;;
 esac
 
 # Dataset selection
-select_menu dataset_choice "Select Dataset:" "1" \
-  "Market-1501 (default)" \
+dataset_choice=""
+dataset_label=""
+ui_select dataset_choice dataset_label "Select Dataset:" "1" \
+  "Market-1501" \
   "DukeMTMC-reID" \
   "MSMT17" \
   "CUB-200-2011" \
@@ -386,7 +289,7 @@ case "$dataset_choice" in
   6) dataset="veri";      raw_data_dir="./data/VeRi";      prepare_script="prepare_VeRi.py" ;;
   7) dataset="viper";     raw_data_dir="./data/VIPeR";     prepare_script="prepare_viper.py" ;;
   *)
-    echo "Invalid dataset number: $dataset_choice"
+    ui_error "Invalid dataset number: $dataset_choice"
     exit 1
     ;;
 esac
@@ -394,8 +297,10 @@ esac
 data_dir="${raw_data_dir}/pytorch"
 
 # Loss selection
-select_menu loss_choice "Select Loss:" "1" \
-  "CrossEntropy (default)" \
+loss_choice=""
+loss_label=""
+ui_select loss_choice loss_label "Select Loss:" "1" \
+  "CrossEntropy" \
   "Circle" \
   "Triplet" \
   "ArcFace" \
@@ -418,39 +323,40 @@ case "$loss_choice" in
   9) loss_name="lifted"; loss_flags=(--lifted) ;;
   10) loss_name="sphere"; loss_flags=(--sphere) ;;
   *)
-    echo "Invalid loss number: $loss_choice"
+    ui_error "Invalid loss number: $loss_choice"
     exit 1
     ;;
 esac
 
 default_warm_epoch="5"
-inputer warm_epoch "warm_epoch" "$default_warm_epoch" '^[0-9]+$' "" "Invalid warm_epoch: please enter a non-negative integer."
+ui_input warm_epoch "warm_epoch" "$default_warm_epoch" '^[0-9]+$' "" "Invalid warm_epoch: please enter a non-negative integer."
 
 default_stride="2"
-inputer stride "stride" "$default_stride" '^[1-9][0-9]*$' "" "Invalid stride: please enter a positive integer."
+ui_input stride "stride" "$default_stride" '^[1-9][0-9]*$' "" "Invalid stride: please enter a positive integer."
 
 erasing_p="0"
-inputer erasing_p "erasing_p" "0" '^([0-9]+([.][0-9]+)?|[.][0-9]+)$' "v >= 0 && v <= 1" "Invalid erasing_p: please enter a number in [0, 1]."
-color_jitter="$(confirmer "Enable color_jitter?" "n")"
+ui_input erasing_p "erasing_p" "0" '^([0-9]+([.][0-9]+)?|[.][0-9]+)$' "v >= 0 && v <= 1" "Invalid erasing_p: please enter a number in [0, 1]."
+color_jitter="no"
+ui_yes_no color_jitter "color_jitter" "2"
 
 default_batchsize="32"
 default_lr="0.05"
 
-inputer batchsize "batchsize" "$default_batchsize" '^[1-9][0-9]*$' "" "Invalid batchsize: please enter a positive integer."
-inputer lr "lr" "$default_lr" '^([0-9]+([.][0-9]+)?|[.][0-9]+)$' "v > 0" "Invalid lr: please enter a positive number."
+ui_input batchsize "batchsize" "$default_batchsize" '^[1-9][0-9]*$' "" "Invalid batchsize: please enter a positive integer."
+ui_input lr "lr" "$default_lr" '^([0-9]+([.][0-9]+)?|[.][0-9]+)$' "v > 0" "Invalid lr: please enter a positive number."
 
 gpu_ids="0"
-inputer gpu_ids "gpu_ids" "$gpu_ids"
+ui_input gpu_ids "gpu_ids" "$gpu_ids"
 
-inputer which_epoch "which_epoch" "last"
+ui_input which_epoch "which_epoch" "last"
 
 run_id="$(python tool/run_id.py)"
 lr_tag="${lr//./p}"
 erasing_tag="${erasing_p//./p}"
 default_run_name="${run_id}_${backbone}_${dataset}_${loss_name}_w${warm_epoch}_s${stride}_b${batchsize}_lr${lr_tag}_re${erasing_tag}"
-inputer run_name "run_name" "$default_run_name"
+ui_input run_name "run_name" "$default_run_name"
 
-# Configure mirror options before run confirmation.
+# Setting mirror
 mirror_config_hf "$backbone"
 mirror_config_ibn "$backbone"
 
@@ -458,7 +364,8 @@ mirror_config_ibn "$backbone"
 # Run confirmation
 # =========================
 
-echo "----------------------------------------"
+ui_warn "Please confirm your configuration before starting the training workflow."
+echo "================ Run configuration ================"
 echo "run_id        : $run_id"
 echo "backbone      : $backbone"
 echo "dataset       : $dataset"
@@ -472,27 +379,22 @@ echo "lr            : $lr"
 echo "run_name      : $run_name"
 echo "hf_mirror     : $HF_MIRROR_STATUS"
 echo "ibn_mirror    : $IBN_MIRROR_STATUS"
-echo "----------------------------------------"
-confirm_run="$(confirmer "Confirm and start train+evaluate workflow?" "y")"
-case "$confirm_run" in
-  y)
-    ;;
-  n)
-    echo "Canceled."
-    exit 0
-    ;;
-esac
+echo "==================================================="
+confirm_run="no"
+ui_yes_no confirm_run "Confirm and start train+evaluate workflow?" "1"
+if [[ "$confirm_run" != "yes" ]]; then
+  ui_warn "Canceled."
+  exit 0
+fi
 
 # =========================
-# Runtime setup and execution
+# Runtime setup
 # =========================
-ensure_ibn_checkpoint "$backbone"
-
-# Build train/test commands from selected options.
+download_ibn_backbone "$backbone"
 train_cmd=(python train.py --gpu_ids "$gpu_ids" --name "$run_name" --data_dir "$data_dir" --run_id "$run_id")
 train_cmd+=(--train_all)
 train_cmd+=(--erasing_p "$erasing_p")
-if [[ "$color_jitter" == "y" ]]; then
+if [[ "$color_jitter" == "yes" ]]; then
   train_cmd+=(--color_jitter)
 fi
 train_cmd+=(--warm_epoch "$warm_epoch")
@@ -501,17 +403,16 @@ train_cmd+=(--batchsize "$batchsize")
 train_cmd+=(--lr "$lr")
 train_cmd+=("${backbone_flags[@]}")
 train_cmd+=("${loss_flags[@]}")
-
 test_cmd=(python test.py --gpu_ids "$gpu_ids" --name "$run_name" --test_dir "$data_dir" --which_epoch "$which_epoch" --run_id "$run_id")
 
 # =========================
-# Execution workflow
+# Execution
 # =========================
 echo "[1/4] Installing dependencies..."
 python -m pip install -r requirements.txt
 
 echo "[2/4] Preparing dataset..."
-ensure_dataset_ready "$dataset" "$raw_data_dir" "$data_dir" "$prepare_script"
+prepare_dataset "$dataset" "$raw_data_dir" "$data_dir" "$prepare_script"
 
 echo "[3/4] Training..."
 "${train_cmd[@]}"
@@ -519,7 +420,9 @@ echo "[3/4] Training..."
 echo "[4/4] Testing..."
 "${test_cmd[@]}"
 
-echo "Done. Artifacts:"
-echo "  model dir : ./model/${run_name}"
-echo "  result    : ./model/${run_name}/result.txt"
-echo "  run_id    : ${run_id}"
+ui_success "Training and evaluation completed successfully!"
+echo "==================== Artifacts ===================="
+echo "model dir : ./model/${run_name}"
+echo "result    : ./model/${run_name}/result.txt"
+echo "run_id    : ${run_id}"
+echo "==================================================="
