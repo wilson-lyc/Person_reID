@@ -119,9 +119,12 @@ mirror_config_hf() {
 
   [[ -n "${HF_ENDPOINT:-}" ]] && ui_info "Current HF_ENDPOINT: ${HF_ENDPOINT}"
 
-  ui_yes_no use_hf_mirror \
+  local use_hf_mirror_idx=""
+  ui_select use_hf_mirror_idx use_hf_mirror \
     "${backbone_tip} may download weights from Hugging Face. Use mirror (https://hf-mirror.com)?" \
-    "1"
+    "1" \
+    "yes" \
+    "no"
 
   if [[ "$use_hf_mirror" == "yes" ]]; then
     export HF_ENDPOINT="https://hf-mirror.com"
@@ -149,7 +152,8 @@ mirror_config_ibn() {
     return 0
   fi
 
-  ui_yes_no use_mirror "Use mirror URL for IBN checkpoint download?" "1"
+  local use_mirror_idx=""
+  ui_select use_mirror_idx use_mirror "Use mirror URL for IBN checkpoint download?" "1" "yes" "no"
   if [[ "$use_mirror" == "yes" ]]; then
     IBN_DOWNLOAD_SOURCE="mirror"
     IBN_MIRROR_STATUS="yes"
@@ -342,7 +346,8 @@ ui_input erasing_p "erasing_p" "0" '^([0-9]+([.][0-9]+)?|[.][0-9]+)$' "v >= 0 &&
 
 # color_jitter
 color_jitter="no"
-ui_yes_no color_jitter "color_jitter" "2"
+color_jitter_idx=""
+ui_select color_jitter_idx color_jitter "color_jitter" "2" "yes" "no"
 
 # batchsize
 default_batchsize="32"
@@ -392,7 +397,8 @@ echo "hf_mirror     : $HF_MIRROR_STATUS"
 echo "ibn_mirror    : $IBN_MIRROR_STATUS"
 echo "==================================================="
 confirm_run="no"
-ui_yes_no confirm_run "Confirm and start train+evaluate workflow?" "1"
+confirm_run_idx=""
+ui_select confirm_run_idx confirm_run "Confirm and start train+evaluate workflow?" "1" "yes" "no"
 if [[ "$confirm_run" != "yes" ]]; then
   ui_warn "Canceled."
   exit 0

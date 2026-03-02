@@ -65,30 +65,6 @@ ui_warn() { ui_badge warn "$*"; }
 ui_error() { ui_badge error "$*"; }
 
 # Purpose:
-#   Prompt a yes/no selection and return normalized 0/1 value.
-# Inputs:
-#   $1 out_var: destination variable name (written via printf -v).
-#   $2 prompt: question shown to user.
-#   $3 default_index (optional): 1 for yes, 2 for no; defaults to 1.
-# Outputs:
-#   Stores yes or no into out_var.
-# Exit Codes:
-#   0 on successful selection.
-ui_yes_no() {
-  local __outvar="$1"
-  local prompt="$2"
-  local default_index="${3:-1}"
-  local yn_idx="" yn_val=""
-
-  ui_select yn_idx yn_val "$prompt" "$default_index" "yes" "no"
-  if [[ "$yn_idx" == "1" ]]; then
-    printf -v "$__outvar" 'yes'
-  else
-    printf -v "$__outvar" 'no'
-  fi
-}
-
-# Purpose:
 #   Print project banner and script metadata.
 # Inputs:
 #   $1 script_name (optional): displayed script name, defaults to basename "$0".
