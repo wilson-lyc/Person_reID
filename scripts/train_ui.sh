@@ -13,6 +13,35 @@ fi
 source "$COMMON_UI_LIB"
 
 CURRENT_SCRIPT="$(basename "$0")"
+PLATFORM="unknown"
+PYTHON_BIN=""
+
+# =========================
+# Runtime detection
+# =========================
+detect_platform() {
+  local os_name
+  os_name="$(uname -s 2>/dev/null || echo unknown)"
+  case "$os_name" in
+    Linux*)  PLATFORM="linux" ;;
+    Darwin*) PLATFORM="macos" ;;
+    MINGW*|MSYS*|CYGWIN*) PLATFORM="windows" ;;
+    *)       PLATFORM="unknown" ;;
+  esac
+}
+
+resolve_python_bin() {
+  if command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN="python3"
+    return 0
+  fi
+  if command -v python >/dev/null 2>&1; then
+    PYTHON_BIN="python"
+    return 0
+  fi
+  ui_error "Python executable not found. Please install python3/python and retry."
+  return 1
+}
 
 # =========================
 # Dataset preparation
@@ -80,7 +109,7 @@ prepare_dataset() {
   fi
 
   ui_info "Preparing dataset..."
-  if ! python "$prepare_script" --path "$raw_dir"; then
+  if ! "$PYTHON_BIN" "$prepare_script" --path "$raw_dir"; then
     ui_error "Dataset preparation failed. Error while running ${prepare_script}."
     return 1
   fi
@@ -165,7 +194,12 @@ download_ibn_backbone() {
     return 0
   fi
 
-  local checkpoint_path="/root/.cache/torch/hub/checkpoints/resnet50_ibn_a-d9d0bb7b.pth"
+  local home_dir="${HOME:-}"
+  if [[ -z "$home_dir" ]]; then
+    home_dir="$(cd ~ 2>/dev/null && pwd || true)"
+  fi
+  local torch_home="${TORCH_HOME:-${home_dir}/.cache/torch}"
+  local checkpoint_path="${torch_home}/hub/checkpoints/resnet50_ibn_a-d9d0bb7b.pth"
   local checkpoint_dir
   checkpoint_dir="$(dirname "$checkpoint_path")"
   local direct_url="https://github.com/XingangPan/IBN-Net/releases/download/v1.0/resnet50_ibn_a-d9d0bb7b.pth"
@@ -231,6 +265,10 @@ download_ibn_backbone() {
 # =========================
 clear
 ui_banner "$CURRENT_SCRIPT"
+detect_platform
+resolve_python_bin
+ui_info "Detected platform: ${PLATFORM}"
+ui_info "Using Python: ${PYTHON_BIN}"
 
 # Backbone selection
 backbone_choice=""
@@ -350,7 +388,7 @@ ui_input gpu_ids "gpu_ids" "$gpu_ids"
 
 ui_input which_epoch "which_epoch" "last"
 
-run_id="$(python tool/run_id.py)"
+run_id="$("$PYTHON_BIN" tool/run_id.py)"
 lr_tag="${lr//./p}"
 erasing_tag="${erasing_p//./p}"
 default_run_name="${run_id}_${backbone}_${dataset}_${loss_name}_w${warm_epoch}_s${stride}_b${batchsize}_lr${lr_tag}_re${erasing_tag}"
@@ -391,7 +429,7 @@ fi
 # Runtime setup
 # =========================
 download_ibn_backbone "$backbone"
-train_cmd=(python train.py --gpu_ids "$gpu_ids" --name "$run_name" --data_dir "$data_dir" --run_id "$run_id")
+train_cmd=("$PYTHON_BIN" train.py --gpu_ids "$gpu_ids" --name "$run_name" --data_dir "$data_dir" --run_id "$run_id")
 train_cmd+=(--train_all)
 train_cmd+=(--erasing_p "$erasing_p")
 if [[ "$color_jitter" == "yes" ]]; then
@@ -403,13 +441,13 @@ train_cmd+=(--batchsize "$batchsize")
 train_cmd+=(--lr "$lr")
 train_cmd+=("${backbone_flags[@]}")
 train_cmd+=("${loss_flags[@]}")
-test_cmd=(python test.py --gpu_ids "$gpu_ids" --name "$run_name" --test_dir "$data_dir" --which_epoch "$which_epoch" --run_id "$run_id")
+test_cmd=("$PYTHON_BIN" test.py --gpu_ids "$gpu_ids" --name "$run_name" --test_dir "$data_dir" --which_epoch "$which_epoch" --run_id "$run_id")
 
 # =========================
 # Execution
 # =========================
 echo "[1/4] Installing dependencies..."
-python -m pip install -r requirements.txt
+"$PYTHON_BIN" -m pip install -r requirements.txt
 
 echo "[2/4] Preparing dataset..."
 prepare_dataset "$dataset" "$raw_data_dir" "$data_dir" "$prepare_script"

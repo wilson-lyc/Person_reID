@@ -153,7 +153,7 @@ ui_input() {
 
   if ui_use_color; then
     printf '\033[1A\r\033[2K'
-    printf '%s: \033[1;36m%s\033[0m\n' "$label" "$value"
+    printf '\033[1;36m%s:\033[0m %s\n' "$label" "$value"
   else
     printf '%s: %s\n' "$label" "$value"
   fi
