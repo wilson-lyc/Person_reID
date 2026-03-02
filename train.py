@@ -28,6 +28,7 @@ from tool.lark import lark_notify, lark_log
 version =  torch.__version__
 from pytorch_metric_learning import losses, miners
 
+# ===== Stage 1: Parse training configuration (CLI args) =====
 parser = argparse.ArgumentParser(description='Training')
 parser.add_argument('--gpu_ids',default='0', type=str,help='gpu_ids: e.g. 0  0,1,2  0,2')
 parser.add_argument('--name',default='ft_ResNet50', type=str, help='output model name')
@@ -78,6 +79,7 @@ opt = parser.parse_args()
 run_id = opt.run_id
 print(f"name={opt.name}")
 
+# ===== Stage 2: Initialize runtime environment (precision/GPU/CUDNN) =====
 if opt.DG:
     opt.wa = True
 
@@ -106,6 +108,7 @@ if opt.use_swin:
 else:
     h, w = 256, 128
 
+# ===== Stage 3: Build data augmentation and preprocessing pipelines =====
 transform_train_list = [
         transforms.Resize((h, w), interpolation=3),
         transforms.Pad(10),
@@ -145,7 +148,7 @@ data_transforms = {
     'val': transforms.Compose(transform_val_list),
 }
 
-
+# ===== Stage 4: Load datasets and create DataLoaders =====
 train_all = ''
 if opt.train_all:
      train_all = '_all'
@@ -207,6 +210,7 @@ def fliplr(img):
     return img_flip
 
 def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
+    # ===== Stage 8: Enter main training loop (epoch loop) =====
     since = time.time()
     best_val_acc = 0.0
 
@@ -308,6 +312,7 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
             print("start weight avg")
         
         for phase in ['train', 'val']:
+            # Sub-stage: switch train/val behavior and iterate all batches
             if phase == 'train':
                 model.train(True)
             else:
@@ -326,6 +331,7 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
             running_loss = 0.0
             running_corrects = 0.0
             for iter, data in enumerate(dataloaders[phase]):
+                # Sub-stage: single-batch forward, loss computation, and (train only) backward update
                 inputs, labels = data
                 now_batch_size,c,h,w = inputs.shape
                 pbar.update(1)
@@ -400,6 +406,7 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
 
                 del inputs
                 if opt.DG and phase == 'train' and epoch > num_epochs*0.8:
+                    # Sub-stage: add DG regularization near the end (student-teacher consistency)
                     try:
                         _, batch = DGloader_iter.__next__()
                     except StopIteration: 
@@ -488,6 +495,7 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
                 draw_curve(epoch)
             if phase == 'train':
                 scheduler.step()
+        # Sub-stage: record per-epoch logs and progress notifications
         total_elapsed = time.time() - since
         epoch_elapsed = time.time() - epoch_start
         current_lr = optimizer.param_groups[0]['lr']
@@ -532,6 +540,7 @@ def train_model(model, criterion, optimizer, scheduler, scaler, num_epochs=25):
 
     time_elapsed = time.time() - since
     print(f"training complete in {format_duration(time_elapsed)}")
+    # ===== Stage 9: Finalize training (load best/save final models and notify) =====
     model.load_state_dict(last_model_wts)
     if len(opt.gpu_ids)>1:
         save_network(model.module, opt.name, 'last')
@@ -578,6 +587,7 @@ fig = plt.figure()
 ax0 = fig.add_subplot(121, title="loss")
 ax1 = fig.add_subplot(122, title="top1err")
 def draw_curve(current_epoch):
+    # Continuously update and overwrite loss/error curves during training
     x_epoch.append(current_epoch)
     ax0.plot(x_epoch, y_loss['train'], 'bo-', label='train')
     ax0.plot(x_epoch, y_loss['val'], 'ro-', label='val')
@@ -590,6 +600,7 @@ def draw_curve(current_epoch):
 
 return_feature = opt.arcface or opt.cosface or opt.circle or opt.triplet or opt.contrast or opt.instance or opt.lifted or opt.sphere
 
+# ===== Stage 5: Build backbone and classifier head based on config =====
 if opt.use_dense:
     model = ft_net_dense(len(class_names), opt.droprate, opt.stride, circle = return_feature, linear_num=opt.linear_num)
 elif opt.use_NAS:
@@ -615,6 +626,7 @@ if opt.PCB:
 opt.nclasses = len(class_names)
 model = model.cuda()
 
+# ===== Stage 6: Build optimizer (grouped LR for backbone/classifier) =====
 optim_name = optim.SGD
 if opt.FSGD:
     optim_name = FusedSGD
@@ -673,6 +685,7 @@ exp_lr_scheduler = optim.lr_scheduler.StepLR(optimizer_ft, step_size=opt.total_e
 if opt.cosine:
     exp_lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer_ft, opt.total_epoch, eta_min=0.01*opt.lr)
 
+# ===== Stage 7: Create experiment directory and persist config snapshots =====
 dir_name = os.path.join('./model',name)
 if not os.path.isdir(dir_name):
     os.mkdir(dir_name)
@@ -684,6 +697,7 @@ with open('%s/opts.yaml'%dir_name,'w') as fp:
 
 criterion = nn.CrossEntropyLoss()
 
+# ===== Stage 10: Launch training =====
 scaler = torch.cuda.amp.GradScaler()
 model = train_model(model, criterion, optimizer_ft, exp_lr_scheduler,
                        scaler, num_epochs=opt.total_epoch)
