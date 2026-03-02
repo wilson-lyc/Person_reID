@@ -1,12 +1,34 @@
 #!/usr/bin/env bash
 
-# Standalone UI helpers for interactive shell scripts.
-# This file is intentionally independent from scripts/common.sh.
+# Purpose:
+#   Standalone UI helpers for interactive shell scripts.
+# Agent Notes:
+#   - Keep this file dependency-free except basic POSIX/bash tools.
+#   - Do not assume scripts/common.sh is sourced.
+#   - Prefer stable function signatures; other scripts call these directly.
 
+# Purpose:
+#   Detect whether colored output is appropriate for current stdout.
+# Inputs:
+#   None.
+# Outputs:
+#   None (boolean via exit code).
+# Exit Codes:
+#   0: color-capable terminal.
+#   1: non-interactive output.
 ui_use_color() {
   [[ -t 1 ]]
 }
 
+# Purpose:
+#   Print a one-line badge message with optional color.
+# Inputs:
+#   $1 kind: info|tip|success|warn|error|other
+#   $2 text: message body
+# Outputs:
+#   Writes formatted text to stdout.
+# Side Effects:
+#   Emits terminal color escapes when tty is detected.
 ui_badge() {
   local kind="$1"
   local text="$2"
@@ -31,15 +53,76 @@ ui_badge() {
   fi
 }
 
+# Purpose: Wrapper of ui_badge(kind=info).
 ui_info() { ui_badge info "$*"; }
+# Purpose: Wrapper of ui_badge(kind=tip).
 ui_tip() { ui_badge tip "$*"; }
+# Purpose: Wrapper of ui_badge(kind=success).
 ui_success() { ui_badge success "$*"; }
+# Purpose: Wrapper of ui_badge(kind=warn).
 ui_warn() { ui_badge warn "$*"; }
+# Purpose: Wrapper of ui_badge(kind=error).
 ui_error() { ui_badge error "$*"; }
 
-# Validated input prompt.
-# Usage:
-#   ui_input out_var "label" "default" [regex] [range_expr] [err_msg]
+# Purpose:
+#   Prompt a yes/no selection and return normalized 0/1 value.
+# Inputs:
+#   $1 out_var: destination variable name (written via printf -v).
+#   $2 prompt: question shown to user.
+#   $3 default_index (optional): 1 for yes, 2 for no; defaults to 1.
+# Outputs:
+#   Stores yes or no into out_var.
+# Exit Codes:
+#   0 on successful selection.
+ui_yes_no() {
+  local __outvar="$1"
+  local prompt="$2"
+  local default_index="${3:-1}"
+  local yn_idx="" yn_val=""
+
+  ui_select yn_idx yn_val "$prompt" "$default_index" "yes" "no"
+  if [[ "$yn_idx" == "1" ]]; then
+    printf -v "$__outvar" 'yes'
+  else
+    printf -v "$__outvar" 'no'
+  fi
+}
+
+# Purpose:
+#   Print project banner and script metadata.
+# Inputs:
+#   $1 script_name (optional): displayed script name, defaults to basename "$0".
+# Outputs:
+#   Banner and metadata lines to stdout.
+ui_banner() {
+  local script_name="${1:-$(basename "$0")}"
+  cat <<'EOF'
+██████╗ ███████╗██████╗ ███████╗ ██████╗ ███╗   ██╗    ██████╗ ███████╗██╗██████╗
+██╔══██╗██╔════╝██╔══██╗██╔════╝██╔═══██╗████╗  ██║    ██╔══██╗██╔════╝██║██╔══██╗
+██████╔╝█████╗  ██████╔╝███████╗██║   ██║██╔██╗ ██║    ██████╔╝█████╗  ██║██║  ██║
+██╔═══╝ ██╔══╝  ██╔══██╗╚════██║██║   ██║██║╚██╗██║    ██╔══██╗██╔══╝  ██║██║  ██║
+██║     ███████╗██║  ██║███████║╚██████╔╝██║ ╚████║    ██║  ██║███████╗██║██████╔╝
+╚═╝     ╚══════╝╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═╝  ╚═══╝    ╚═╝  ╚═╝╚══════╝╚═╝╚═════╝
+EOF
+  printf '%s\n' "============================================================"
+  printf '%s\n' "Designed by Wilson | Implemented by Codex"
+  printf 'Script: %s\n' "$script_name"
+  printf '%s\n' "============================================================"
+}
+
+# Purpose:
+#   Prompt for scalar input with validation and store into caller variable.
+# Inputs:
+#   $1 out_var: destination variable name (written via printf -v).
+#   $2 label: prompt/field label.
+#   $3 default: fallback when user presses Enter.
+#   $4 regex (optional): bash regex condition.
+#   $5 range_expr (optional): awk boolean expression using variable v.
+#   $6 err_msg (optional): message shown on invalid input.
+# Outputs:
+#   Prints a normalized confirmation line after accepted input.
+# Exit Codes:
+#   0: value stored in out_var.
 ui_input() {
   local __outvar="$1"
   local label="$2"
@@ -78,13 +161,23 @@ ui_input() {
   printf -v "$__outvar" '%s' "$value"
 }
 
-# Enhanced selector with page support and cancel key.
-# Usage:
-#   ui_select out_idx_var out_value_var "Title" "default_index_1_based" "Option A" ...
-# Result:
-#   - Writes 1-based index to out_idx_var and option text to out_value_var.
-#   - Also exports UI_SELECT_INDEX / UI_SELECT_VALUE.
-#   - Returns 130 when user cancels with q/Q (TTY mode).
+# Purpose:
+#   Interactive selector with TTY navigation and non-TTY numeric fallback.
+# Inputs:
+#   $1 out_idx_var: destination variable for selected 1-based index.
+#   $2 out_value_var: destination variable for selected option text.
+#   $3 title: selector title/prompt.
+#   $4 default_index: default 1-based index.
+#   $5... options: selectable option labels.
+# Outputs:
+#   Sets caller vars via printf -v and exports UI_SELECT_INDEX/UI_SELECT_VALUE.
+# Exit Codes:
+#   0: selection confirmed.
+#   1: invalid arguments.
+#   130: canceled or interrupted.
+# Agent Notes:
+#   - Non-TTY mode prints numbered options and reads numeric choice.
+#   - TTY mode supports arrows, k/j, Enter confirm, q cancel.
 ui_select() {
   local __out_idx_var="$1"
   local __out_val_var="$2"
@@ -100,6 +193,7 @@ ui_select() {
   local start=0
   local end=0
   local tty_mode=0
+  local default_tag=" (default)"
 
   if [[ ${#options[@]} -eq 0 ]]; then
     ui_error "ui_select: requires at least one option."
@@ -119,8 +213,13 @@ ui_select() {
   if (( tty_mode == 0 )); then
     echo "$title"
     local i
+    local option_text
     for i in "${!options[@]}"; do
-      printf "  %d) %s\n" "$((i + 1))" "${options[$i]}"
+      option_text="${options[$i]}"
+      if (( i + 1 == default_index )); then
+        option_text+="$default_tag"
+      fi
+      printf "  %d) %s\n" "$((i + 1))" "$option_text"
     done
     while true; do
       read -r -p "Enter choice [${default_index}]: " input_choice || input_choice=""
@@ -152,6 +251,10 @@ ui_select() {
       page_size=5
     fi
 
+    # Purpose:
+    #   Render current selector page in interactive TTY mode.
+    # Side Effects:
+    #   Clears screen region and prints title/options/page info.
     _ui_select_draw() {
       if (( has_tput == 1 )); then
         tput cup 0 0 2>/dev/null || true
@@ -162,15 +265,20 @@ ui_select() {
 
       printf "%s\n" "$title"
       printf "  (Up/Down or k/j, Enter confirm, q cancel)\n"
+      local display_text
       for ((idx = start; idx <= end; idx++)); do
+        display_text="${options[$idx]}"
+        if (( idx + 1 == default_index )); then
+          display_text+="$default_tag"
+        fi
         if (( idx == selected_idx )); then
           if ui_use_color; then
-            printf "\033[1;34m> %s\033[0m\n" "${options[$idx]}"
+            printf "\033[1;34m> %s\033[0m\n" "$display_text"
           else
-            printf "> %s\n" "${options[$idx]}"
+            printf "> %s\n" "$display_text"
           fi
         else
-          printf "  %s\n" "${options[$idx]}"
+          printf "  %s\n" "$display_text"
         fi
       done
       if (( ${#options[@]} > page_size )); then
@@ -178,6 +286,10 @@ ui_select() {
       fi
     }
 
+    # Purpose:
+    #   Restore terminal state after interactive selector.
+    # Side Effects:
+    #   Re-enables cursor and exits alt screen when enabled.
     _ui_select_restore() {
       if (( has_tput == 1 )); then
         tput cnorm 2>/dev/null || true
@@ -187,6 +299,10 @@ ui_select() {
       fi
     }
 
+    # Purpose:
+    #   Handle INT/TERM while selector is active.
+    # Exit Codes:
+    #   130 to match shell interrupt/cancel semantics.
     _ui_select_on_interrupt() {
       interrupted=1
       _ui_select_restore
@@ -252,7 +368,8 @@ ui_select() {
       return 130
     fi
     if (( use_alt_screen == 0 )); then
-      # Clear selector menu first, then echo the final selected value.
+      # Notes:
+      #   Clear selector menu first, then print the final selected value.
       if (( has_tput == 1 )); then
         tput cup 0 0 2>/dev/null || true
         tput ed 2>/dev/null || true
