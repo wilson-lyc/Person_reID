@@ -153,10 +153,8 @@ ui_input() {
 
   if ui_use_color; then
     printf '\033[1A\r\033[2K'
-    printf '\033[1;36m%s:\033[0m %s\n' "$label" "$value"
-  else
-    printf '%s: %s\n' "$label" "$value"
   fi
+  printf '%s: %s\n' "$label" "$value"
 
   printf -v "$__outvar" '%s' "$value"
 }
@@ -299,13 +297,9 @@ ui_select() {
           display_text+="$default_tag"
         fi
         if (( idx == selected_idx )); then
-          if ui_use_color; then
-            printf "\033[0m\033[1;34m> %s\033[0m\n" "$display_text"
-          else
-            printf "> %s\n" "$display_text"
-          fi
+          printf "> %s\n" "$display_text"
         else
-          printf "\033[0m  %s\n" "$display_text"
+          printf "  %s\n" "$display_text"
         fi
         draw_lines=$((draw_lines + 1))
       done
@@ -398,11 +392,7 @@ ui_select() {
 
   UI_SELECT_INDEX=$((selected_idx + 1))
   UI_SELECT_VALUE="${options[$selected_idx]}"
-  if ui_use_color; then
-    printf "\033[1;36m%s:\033[0m %s\n" "$display_label" "$UI_SELECT_VALUE"
-  else
-    printf "%s: %s\n" "$display_label" "$UI_SELECT_VALUE"
-  fi
+  printf "%s: %s\n" "$display_label" "$UI_SELECT_VALUE"
   printf -v "$__out_idx_var" '%s' "$UI_SELECT_INDEX"
   printf -v "$__out_val_var" '%s' "$UI_SELECT_VALUE"
 }
