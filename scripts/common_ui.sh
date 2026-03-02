@@ -4,7 +4,6 @@
 #   Standalone UI helpers for interactive shell scripts.
 # Agent Notes:
 #   - Keep this file dependency-free except basic POSIX/bash tools.
-#   - Do not assume scripts/common.sh is sourced.
 #   - Prefer stable function signatures; other scripts call these directly.
 
 # Purpose:
