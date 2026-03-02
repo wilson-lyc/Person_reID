@@ -5,74 +5,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "$REPO_ROOT"
 
-COMMON_LIB="${SCRIPT_DIR}/common.sh"
-if [[ ! -f "$COMMON_LIB" ]]; then
-  echo "Missing shared shell library: ${COMMON_LIB}"
+COMMON_UI_LIB="${SCRIPT_DIR}/common_ui.sh"
+if [[ ! -f "$COMMON_UI_LIB" ]]; then
+  echo "Missing global UI library: ${COMMON_UI_LIB}"
   exit 1
 fi
-source "$COMMON_LIB"
+source "$COMMON_UI_LIB"
 
-print_banner() {
-cat <<'EOF'
-██████╗ ███████╗██████╗ ███████╗ ██████╗ ███╗   ██╗    ██████╗ ███████╗██╗██████╗
-██╔══██╗██╔════╝██╔══██╗██╔════╝██╔═══██╗████╗  ██║    ██╔══██╗██╔════╝██║██╔══██╗
-██████╔╝█████╗  ██████╔╝███████╗██║   ██║██╔██╗ ██║    ██████╔╝█████╗  ██║██║  ██║
-██╔═══╝ ██╔══╝  ██╔══██╗╚════██║██║   ██║██║╚██╗██║    ██╔══██╗██╔══╝  ██║██║  ██║
-██║     ███████╗██║  ██║███████║╚██████╔╝██║ ╚████║    ██║  ██║███████╗██║██████╔╝
-╚═╝     ╚══════╝╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═╝  ╚═══╝    ╚═╝  ╚═╝╚══════╝╚═╝╚═════╝
-EOF
-  local script_name
-  script_name="$(basename "$0")"
-  echo "============================================================"
-  echo "Designed by Wilson | Implemented by Codex"
-  echo "Script: ${script_name}"
-  echo "============================================================"
-}
-
-inputer() {
-  local __outvar="$1"
-  local label="$2"
-  local default_value="$3"
-  local regex="${4:-}"
-  local range_expr="${5:-}"
-  local err_msg="${6:-Invalid input.}"
-  local value=""
-  local ok=1
-  local color_selected=""
-  local color_reset=""
-
-  if [[ -t 1 ]]; then
-    color_selected="\033[1;36m"
-    color_reset="\033[0m"
-  fi
-
-  while true; do
-    read -r -p "${label} [${default_value}]: " value
-    value="${value:-$default_value}"
-    ok=1
-
-    if [[ -n "$regex" ]] && [[ ! "$value" =~ $regex ]]; then
-      ok=0
-    fi
-    if [[ $ok -eq 1 && -n "$range_expr" ]] && ! awk -v v="$value" "BEGIN {exit !($range_expr)}"; then
-      ok=0
-    fi
-
-    if [[ $ok -eq 1 ]]; then
-      break
-    fi
-    echo "$err_msg"
-  done
-
-  if [[ -t 1 ]]; then
-    printf "\033[1A\r\033[2K"
-    printf "%s: %b%s%b\n" "$label" "$color_selected" "$value" "$color_reset"
-  else
-    echo "${label}: ${value}"
-  fi
-
-  printf -v "$__outvar" '%s' "$value"
-}
+CURRENT_SCRIPT="$(basename "$0")"
 
 extract_data_dir_from_opts() {
   local opts_file="$1"
@@ -177,18 +117,20 @@ build_model_candidates() {
 }
 
 clear
-print_banner
+ui_banner "$CURRENT_SCRIPT"
 
-echo "Scanning the trained model ..."
+ui_info "Scanning trained models..."
 MODEL_NAMES=()
 MODEL_DESCS=()
 if ! build_model_candidates; then
-  echo "No trained model was found. Please run train.sh to train the model first."
+  ui_error "No trained model found. Please run train.sh first."
   exit 1
 fi
 
 default_model_idx="${#MODEL_NAMES[@]}"
-select_menu model_choice "Select the model to evaluate:" "$default_model_idx" "${MODEL_DESCS[@]}"
+model_choice=""
+model_label=""
+ui_select model_choice model_label "Select the model to evaluate:" "$default_model_idx" "${MODEL_DESCS[@]}"
 selected_index=$((model_choice - 1))
 name="${MODEL_NAMES[$selected_index]}"
 model_path="./model/${name}"
@@ -211,7 +153,9 @@ case "$default_test_dir" in
   *) default_dataset_choice="1" ;;
 esac
 
-select_menu dataset_choice "Select Evaluation Dataset:" "$default_dataset_choice" \
+dataset_choice=""
+dataset_label=""
+ui_select dataset_choice dataset_label "Select Evaluation Dataset:" "$default_dataset_choice" \
   "Market-1501 (default)" \
   "DukeMTMC-reID" \
   "MSMT17" \
@@ -229,33 +173,33 @@ case "$dataset_choice" in
   6) test_dir="./data/VeRi/pytorch"; eval_dataset_name="VeRi" ;;
   7) test_dir="./data/VIPeR/pytorch"; eval_dataset_name="VIPeR" ;;
   *)
-    echo "Invalid dataset number: $dataset_choice"
+    ui_error "Invalid dataset number: $dataset_choice"
     exit 1
     ;;
 esac
 
 if ! validate_test_dir "$test_dir"; then
-  echo "Invalid test_dir: ${test_dir}"
-  echo "Required folders are missing: ${test_dir}/query and ${test_dir}/gallery"
+  ui_error "Invalid test_dir: ${test_dir}"
+  ui_tip "Required folders are missing: ${test_dir}/query and ${test_dir}/gallery"
   exit 1
 fi
 
-inputer gpu_ids "gpu_ids" "0"
+ui_input gpu_ids "gpu_ids" "0"
 
 default_epoch="last"
 if [[ ! -f "${model_path}/net_last.pth" ]]; then
   if mapfile -t epochs < <(list_available_epochs "$model_path"); then
     default_epoch="${epochs[${#epochs[@]}-1]}"
-    echo "net_last.pth not found. Defaulting which_epoch to latest numeric epoch: ${default_epoch}"
+    ui_warn "net_last.pth not found. Using latest numeric epoch: ${default_epoch}"
   else
-    echo "No available model checkpoint found in ${model_path}."
+    ui_error "No available model checkpoint found in ${model_path}."
     exit 1
   fi
 fi
-inputer which_epoch "which_epoch" "$default_epoch" '^(last|[0-9]+)$' "" "Invalid which_epoch: expected 'last' or a non-negative integer."
+ui_input which_epoch "which_epoch" "$default_epoch" '^(last|[0-9]+)$' "" "Invalid which_epoch: expected 'last' or a non-negative integer."
 
 if ! validate_epoch_exists "$model_path" "$which_epoch"; then
-  echo "Checkpoint for which_epoch='${which_epoch}' not found under ${model_path}."
+  ui_error "Checkpoint for which_epoch='${which_epoch}' not found under ${model_path}."
   echo "Available checkpoints:"
   if [[ -f "${model_path}/net_last.pth" ]]; then
     echo "  - last"
@@ -274,7 +218,9 @@ if [[ "$which_epoch" != "last" ]]; then
   fi
 fi
 
-select_menu eval_mode_choice "Select Evaluation Mode:" "1" \
+eval_mode_choice=""
+eval_mode_label=""
+ui_select eval_mode_choice eval_mode_label "Select Evaluation Mode:" "1" \
   "Normal evaluation (evaluate_gpu.py)" \
   "Re-ranking evaluation (evaluate_rerank.py)"
 
@@ -282,25 +228,27 @@ case "$eval_mode_choice" in
   1) eval_mode="normal"; eval_script="evaluate_gpu.py" ;;
   2) eval_mode="rerank"; eval_script="evaluate_rerank.py" ;;
   *)
-    echo "Invalid evaluation mode: ${eval_mode_choice}"
+    ui_error "Invalid evaluation mode: ${eval_mode_choice}"
     exit 1
     ;;
 esac
 
-echo "----------------------------------------"
+ui_warn "Please confirm your configuration before starting evaluation."
+echo "================ Run configuration ================"
 echo "model_name     : ${name}"
 echo "eval_dataset   : ${eval_dataset_name}"
+echo "gpu_ids        : ${gpu_ids}"
+echo "which_epoch    : ${resolved_which_epoch}"
 echo "eval_mode      : ${eval_mode}"
-echo "----------------------------------------"
+echo "==================================================="
 
-confirm_run="$(confirmer "Confirm and start test+evaluation workflow?" "y")"
-case "$confirm_run" in
-  y) ;;
-  n)
-    echo "Canceled."
-    exit 0
-    ;;
-esac
+confirm_run="no"
+confirm_run_idx=""
+ui_select confirm_run_idx confirm_run "Confirm and start test+evaluation workflow?" "1" "yes" "no"
+if [[ "$confirm_run" != "yes" ]]; then
+  ui_warn "Canceled."
+  exit 0
+fi
 
 result_file="${model_path}/result.txt"
 
@@ -313,12 +261,15 @@ python test.py \
   --skip_eval
 
 if [[ ! -f "pytorch_result.mat" ]]; then
-  echo "test.py finished but pytorch_result.mat was not generated."
+  ui_error "test.py finished but pytorch_result.mat was not generated."
   exit 1
 fi
 
 echo "[2/3] Evaluating..."
 python "$eval_script" | tee -a "$result_file"
 
-echo "Evaluation complete"
-echo "Results have been appended to: ${result_file}"
+ui_success "Evaluation completed successfully."
+echo "==================== Artifacts ===================="
+echo "result    : ${result_file}"
+echo "model dir : ${model_path}"
+echo "==================================================="
