@@ -1,8 +1,13 @@
+import argparse
+import os
+from datetime import datetime
+
+import numpy as np
 import scipy.io
 import torch
-import numpy as np
-#import time
-import os
+
+from tool.lark import lark_log, lark_notify
+from tool.run_id import generate_run_id
 
 #######################################################################
 # Evaluate
@@ -56,7 +61,16 @@ def compute_mAP(index, good_index, junk_index):
     return ap, cmc
 
 ######################################################################
-result = scipy.io.loadmat('pytorch_result.mat')
+parser = argparse.ArgumentParser(description='Evaluate (CPU)')
+parser.add_argument('--result_mat', default='pytorch_result.mat', type=str, help='path to pytorch result mat')
+parser.add_argument('--multi_mat', default='', type=str, help='path to multi-query mat (optional)')
+parser.add_argument('--run_id', default='', type=str, help='external run id for logging')
+args = parser.parse_args()
+
+run_id = args.run_id.strip() or generate_run_id()
+print(f"Evaluated at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+result = scipy.io.loadmat(args.result_mat)
 query_feature = result['query_f']
 query_cam = result['query_cam'][0]
 query_label = result['query_label'][0]
@@ -64,10 +78,19 @@ gallery_feature = result['gallery_f']
 gallery_cam = result['gallery_cam'][0]
 gallery_label = result['gallery_label'][0]
 
-multi = os.path.isfile('multi_query.mat')
+multi_mat_path = args.multi_mat.strip()
+if multi_mat_path:
+    multi = os.path.isfile(multi_mat_path)
+else:
+    fallback_multi = os.path.join(os.path.dirname(args.result_mat) or '.', 'multi_query.mat')
+    if not os.path.isfile(fallback_multi):
+        dataset_suffix = os.path.basename(args.result_mat).replace('pytorch_result_', '')
+        fallback_multi = os.path.join(os.path.dirname(args.result_mat) or '.', f'multi_query_{dataset_suffix}')
+    multi = os.path.isfile(fallback_multi)
+    multi_mat_path = fallback_multi
 
 if multi:
-    m_result = scipy.io.loadmat('multi_query.mat')
+    m_result = scipy.io.loadmat(multi_mat_path)
     mquery_feature = m_result['mquery_f']
     mquery_cam = m_result['mquery_cam'][0]
     mquery_label = m_result['mquery_label'][0]
@@ -85,11 +108,19 @@ for i in range(len(query_label)):
 
 CMC = CMC.float()
 CMC = CMC/len(query_label) #average CMC
-print('Rank@1:%f Rank@5:%f Rank@10:%f mAP:%f'%(CMC[0],CMC[4],CMC[9],ap/len(query_label)))
+rank1 = float(CMC[0].item())
+rank5 = float(CMC[4].item())
+rank10 = float(CMC[9].item())
+map_score = float(ap/len(query_label))
+print('Rank@1:%f Rank@5:%f Rank@10:%f mAP:%f'%(rank1, rank5, rank10, map_score))
 
 # multiple-query
 CMC = torch.IntTensor(len(gallery_label)).zero_()
 ap = 0.0
+multi_rank1 = None
+multi_rank5 = None
+multi_rank10 = None
+multi_map = None
 if multi:
     for i in range(len(query_label)):
         mquery_index1 = np.argwhere(mquery_label==query_label[i])
@@ -104,4 +135,42 @@ if multi:
         #print(i, CMC_tmp[0])
     CMC = CMC.float()
     CMC = CMC/len(query_label) #average CMC
-    print('multi Rank@1:%f Rank@5:%f Rank@10:%f mAP:%f'%(CMC[0],CMC[4],CMC[9],ap/len(query_label)))
+    multi_rank1 = float(CMC[0].item())
+    multi_rank5 = float(CMC[4].item())
+    multi_rank10 = float(CMC[9].item())
+    multi_map = float(ap/len(query_label))
+    print('multi Rank@1:%f Rank@5:%f Rank@10:%f mAP:%f'%(multi_rank1, multi_rank5, multi_rank10, multi_map))
+
+lark_log(
+    project="Person_reID",
+    file="evaluate.py",
+    run_id=run_id,
+    log={
+        "event": "evaluate_end",
+        "result_mat": args.result_mat,
+        "multi_mat": multi_mat_path if multi else "",
+        "multi_used": bool(multi),
+        "rank1": rank1,
+        "rank5": rank5,
+        "rank10": rank10,
+        "mAP": map_score,
+        "multi_rank1": multi_rank1,
+        "multi_rank5": multi_rank5,
+        "multi_rank10": multi_rank10,
+        "multi_mAP": multi_map,
+    },
+)
+lark_notify(
+    title="[Evaluate End] evaluate.py",
+    msg=(
+        f"run_id={run_id}\n"
+        f"result_mat={args.result_mat}\n"
+        f"Rank@1={rank1:.6f}, Rank@5={rank5:.6f}, Rank@10={rank10:.6f}, mAP={map_score:.6f}\n"
+        f"multi_used={bool(multi)}"
+        + (
+            f"\nmulti Rank@1={multi_rank1:.6f}, Rank@5={multi_rank5:.6f}, "
+            f"Rank@10={multi_rank10:.6f}, mAP={multi_map:.6f}"
+            if multi and multi_rank1 is not None else ""
+        )
+    ),
+)

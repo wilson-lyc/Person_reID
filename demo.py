@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 parser = argparse.ArgumentParser(description='Demo')
 parser.add_argument('--query_index', default=777, type=int, help='test_image_index')
 parser.add_argument('--test_dir',default='../Market/pytorch',type=str, help='./test_data')
+parser.add_argument('--result_mat', default='pytorch_result.mat', type=str, help='path to pytorch result mat')
 opts = parser.parse_args()
 
 data_dir = opts.test_dir
@@ -28,7 +29,7 @@ def imshow(path, title=None):
     plt.pause(0.001)  # pause a bit so that plots are updated
 
 ######################################################################
-result = scipy.io.loadmat('pytorch_result.mat')
+result = scipy.io.loadmat(opts.result_mat)
 query_feature = torch.FloatTensor(result['query_f'])
 query_cam = result['query_cam'][0]
 query_label = result['query_label'][0]
@@ -36,10 +37,26 @@ gallery_feature = torch.FloatTensor(result['gallery_f'])
 gallery_cam = result['gallery_cam'][0]
 gallery_label = result['gallery_label'][0]
 
-multi = os.path.isfile('multi_query.mat')
+result_dir = os.path.dirname(opts.result_mat) or '.'
+result_base = os.path.basename(opts.result_mat)
+dataset_suffix = ''
+if result_base.startswith('pytorch_result_') and result_base.endswith('.mat'):
+    dataset_suffix = result_base[len('pytorch_result_'):-len('.mat')]
+
+if dataset_suffix:
+    multi_mat_path = os.path.join(result_dir, f'multi_query_{dataset_suffix}.mat')
+else:
+    multi_mat_path = os.path.join(result_dir, 'multi_query.mat')
+
+if not os.path.isfile(multi_mat_path):
+    fallback_multi = os.path.join(result_dir, 'multi_query.mat')
+    if os.path.isfile(fallback_multi):
+        multi_mat_path = fallback_multi
+
+multi = os.path.isfile(multi_mat_path)
 
 if multi:
-    m_result = scipy.io.loadmat('multi_query.mat')
+    m_result = scipy.io.loadmat(multi_mat_path)
     mquery_feature = torch.FloatTensor(m_result['mquery_f'])
     mquery_cam = m_result['mquery_cam'][0]
     mquery_label = m_result['mquery_label'][0]
@@ -75,13 +92,20 @@ def sort_img(qf, ql, qc, gf, gl, gc):
     return index
 
 i = opts.query_index
+if i < 0 or i >= len(query_label):
+    raise ValueError(f"query_index out of range: {i}, expected 0~{len(query_label)-1}")
 index = sort_img(query_feature[i],query_label[i],query_cam[i],gallery_feature,gallery_label,gallery_cam)
 
 ########################################################################
 # Visualize the rank result
 
 query_path, _ = image_datasets['query'].imgs[i]
-query_label = query_label[i]
+query_pid = int(query_label[i])
+query_camera = int(query_cam[i])
+print(f"result_mat: {opts.result_mat}")
+print(f"query_index: {i}")
+print(f"query_id: {query_pid}")
+print(f"query_cam: {query_camera}")
 print(query_path)
 print('Top 10 images are as follow:')
 try: # Visualize Ranking Result 
@@ -96,7 +120,7 @@ try: # Visualize Ranking Result
         img_path, _ = image_datasets['gallery'].imgs[index[i]]
         label = gallery_label[index[i]]
         imshow(img_path)
-        if label == query_label:
+        if label == query_pid:
             ax.set_title('%d'%(i+1), color='green')
         else:
             ax.set_title('%d'%(i+1), color='red')

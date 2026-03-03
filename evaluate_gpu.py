@@ -3,7 +3,10 @@ import torch
 import numpy as np
 import time
 import os
+import argparse
 from datetime import datetime
+from tool.lark import lark_log, lark_notify
+from tool.run_id import generate_run_id
 
 #######################################################################
 # Evaluate
@@ -62,7 +65,14 @@ def compute_mAP(index, good_index, junk_index):
     return ap, cmc
 
 ######################################################################
-result = scipy.io.loadmat('pytorch_result.mat')
+parser = argparse.ArgumentParser(description='Evaluate (GPU)')
+parser.add_argument('--result_mat', default='pytorch_result.mat', type=str, help='path to pytorch result mat')
+parser.add_argument('--multi_mat', default='', type=str, help='path to multi-query mat (optional)')
+parser.add_argument('--run_id', default='', type=str, help='external run id for logging')
+args = parser.parse_args()
+run_id = args.run_id.strip() or generate_run_id()
+
+result = scipy.io.loadmat(args.result_mat)
 since = time.time()
 print(f"Evaluated at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 query_feature = torch.FloatTensor(result['query_f'])
@@ -72,10 +82,19 @@ gallery_feature = torch.FloatTensor(result['gallery_f'])
 gallery_cam = result['gallery_cam'][0]
 gallery_label = result['gallery_label'][0]
 
-multi = os.path.isfile('multi_query.mat')
+multi_mat_path = args.multi_mat.strip()
+if multi_mat_path:
+    multi = os.path.isfile(multi_mat_path)
+else:
+    fallback_multi = os.path.join(os.path.dirname(args.result_mat) or '.', 'multi_query.mat')
+    if not os.path.isfile(fallback_multi):
+        dataset_suffix = os.path.basename(args.result_mat).replace('pytorch_result_', '')
+        fallback_multi = os.path.join(os.path.dirname(args.result_mat) or '.', f'multi_query_{dataset_suffix}')
+    multi = os.path.isfile(fallback_multi)
+    multi_mat_path = fallback_multi
 
 if multi:
-    m_result = scipy.io.loadmat('multi_query.mat')
+    m_result = scipy.io.loadmat(multi_mat_path)
     mquery_feature = torch.FloatTensor(m_result['mquery_f'])
     mquery_cam = m_result['mquery_cam'][0]
     mquery_label = m_result['mquery_label'][0]
@@ -134,3 +153,39 @@ if multi:
 time_elapsed = time.time() - since
 print('Evaluation complete in {:.0f}m {:.2f}s'.format(time_elapsed // 60, time_elapsed % 60))
 print()
+
+lark_log(
+    project="Person_reID",
+    file="evaluate_gpu.py",
+    run_id=run_id,
+    log={
+        "event": "evaluate_end",
+        "result_mat": args.result_mat,
+        "multi_mat": multi_mat_path if multi else "",
+        "multi_used": bool(multi),
+        "rank1": rank1,
+        "rank5": rank5,
+        "rank10": rank10,
+        "mAP": map_score,
+        "multi_rank1": multi_rank1,
+        "multi_rank5": multi_rank5,
+        "multi_rank10": multi_rank10,
+        "multi_mAP": multi_map,
+        "elapsed_seconds": float(time_elapsed),
+    },
+)
+lark_notify(
+    title="[Evaluate End] evaluate_gpu.py",
+    msg=(
+        f"run_id={run_id}\n"
+        f"result_mat={args.result_mat}\n"
+        f"Rank@1={rank1:.6f}, Rank@5={rank5:.6f}, Rank@10={rank10:.6f}, mAP={map_score:.6f}\n"
+        f"multi_used={bool(multi)}"
+        + (
+            f"\nmulti Rank@1={multi_rank1:.6f}, Rank@5={multi_rank5:.6f}, "
+            f"Rank@10={multi_rank10:.6f}, mAP={multi_map:.6f}"
+            if multi and multi_rank1 is not None else ""
+        )
+        + f"\nelapsed={time_elapsed:.2f}s"
+    ),
+)

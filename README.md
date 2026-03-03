@@ -395,6 +395,12 @@ Evaluate an existing trained model on a selected test dataset:
 bash evaluate.sh
 ```
 
+Run interactive demo visualization from cached result mats:
+
+```bash
+bash scripts/demo.sh
+```
+
 ### Dataset & Preparation
 
 Download [Market1501 Dataset](https://zheng-lab.cecs.anu.edu.au/Project/project_reid.html) [[Google]](https://drive.google.com/file/d/0B8-rUzbwVRk0c054eEozWG9COHM/view) [[Baidu]](https://pan.baidu.com/s/1ntIi2Op) Or use command line:
@@ -461,6 +467,15 @@ python test.py --gpu_ids 0 --name ft_ResNet50 --test_dir your_data_path  --batch
 
 `--data_dir` the path of the testing data.
 
+After testing, result files are saved under model directory with dataset suffix:
+
+```text
+./model/<name>/pytorch_result_<dataset_tag>.mat
+```
+
+Supported `<dataset_tag>` values:
+`market`, `duke`, `msmt`, `cub`, `vehicleid`, `veri`, `viper`.
+
 
 ### Evaluation
 ```bash
@@ -468,6 +483,12 @@ python evaluate.py
 ```
 It will output Rank@1, Rank@5, Rank@10 and mAP results.
 You may also try `evaluate_gpu.py` to conduct a faster evaluation with GPU.
+
+Evaluate a specific cached result mat:
+
+```bash
+python evaluate_gpu.py --result_mat ./model/ft_ResNet50/pytorch_result_market.mat
+```
 
 For mAP calculation, you also can refer to the [C++ code for Oxford Building](http://www.robots.ox.ac.uk/~vgg/data/oxbuildings/compute_ap.cpp). We use the triangle mAP calculation (consistent with the Market1501 original code).
 
@@ -478,6 +499,12 @@ python evaluate_rerank.py
 **It may take more than 10G Memory to run.** So run it on a powerful machine if possible. 
 
 It will output Rank@1, Rank@5, Rank@10 and mAP results.
+
+Evaluate a specific cached result mat with re-ranking:
+
+```bash
+python evaluate_rerank.py --result_mat ./model/ft_ResNet50/pytorch_result_market.mat
+```
 
 ### Tips
 Notes the format of the camera id and the number of cameras.

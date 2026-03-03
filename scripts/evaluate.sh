@@ -80,6 +80,22 @@ validate_test_dir() {
   [[ -d "$test_dir/query" && -d "$test_dir/gallery" ]]
 }
 
+infer_dataset_tag() {
+  local test_dir="$1"
+  local normalized
+  normalized="$(printf '%s' "$test_dir" | tr '[:upper:]' '[:lower:]' | tr '\\' '/')"
+  case "$normalized" in
+    */market/*|*market/pytorch) printf 'market\n' ;;
+    */duke/*|*duke/pytorch) printf 'duke\n' ;;
+    */msmt/*|*msmt/pytorch) printf 'msmt\n' ;;
+    */cub/*|*cub/pytorch) printf 'cub\n' ;;
+    */vehicleid/*|*vehicleid/pytorch) printf 'vehicleid\n' ;;
+    */veri/*|*veri/pytorch) printf 'veri\n' ;;
+    */viper/*|*viper/pytorch) printf 'viper\n' ;;
+    *) printf 'unknown\n' ;;
+  esac
+}
+
 build_model_candidates() {
   local model_root="./model"
   local model_dir=""
@@ -233,6 +249,8 @@ case "$eval_mode_choice" in
     ;;
 esac
 
+run_id="$(python tool/run_id.py)"
+
 ui_warn "Please confirm your configuration before starting evaluation."
 echo "================ Run configuration ================"
 echo "model_name     : ${name}"
@@ -240,6 +258,7 @@ echo "eval_dataset   : ${eval_dataset_name}"
 echo "gpu_ids        : ${gpu_ids}"
 echo "which_epoch    : ${resolved_which_epoch}"
 echo "eval_mode      : ${eval_mode}"
+echo "run_id         : ${run_id}"
 echo "==================================================="
 
 confirm_run="no"
@@ -251,6 +270,9 @@ if [[ "$confirm_run" != "yes" ]]; then
 fi
 
 result_file="${model_path}/result.txt"
+dataset_tag="$(infer_dataset_tag "$test_dir")"
+result_mat="${model_path}/pytorch_result_${dataset_tag}.mat"
+multi_mat="${model_path}/multi_query_${dataset_tag}.mat"
 
 echo "[1/3] Testing..."
 python test.py \
@@ -258,18 +280,29 @@ python test.py \
   --name "$name" \
   --test_dir "$test_dir" \
   --which_epoch "$resolved_which_epoch" \
+  --run_id "$run_id" \
   --skip_eval
 
-if [[ ! -f "pytorch_result.mat" ]]; then
-  ui_error "test.py finished but pytorch_result.mat was not generated."
+if [[ ! -f "$result_mat" ]]; then
+  ui_error "test.py finished but expected result mat was not generated: ${result_mat}"
   exit 1
 fi
 
 echo "[2/3] Evaluating..."
-python "$eval_script" | tee -a "$result_file"
+if [[ "$eval_mode" == "normal" ]]; then
+  eval_cmd=(python "$eval_script" --result_mat "$result_mat" --run_id "$run_id")
+  if [[ -f "$multi_mat" ]]; then
+    eval_cmd+=(--multi_mat "$multi_mat")
+  fi
+else
+  eval_cmd=(python "$eval_script" --result_mat "$result_mat")
+fi
+"${eval_cmd[@]}" | tee -a "$result_file"
 
 ui_success "Evaluation completed successfully."
 echo "==================== Artifacts ===================="
 echo "result    : ${result_file}"
+echo "result mat: ${result_mat}"
 echo "model dir : ${model_path}"
+echo "run_id    : ${run_id}"
 echo "==================================================="

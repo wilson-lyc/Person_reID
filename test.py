@@ -61,6 +61,26 @@ def format_duration(seconds):
     return f"{mins:02d}:{sec:02d}"
 
 
+def infer_dataset_tag(path):
+    normalized = os.path.normpath(path).replace('\\', '/').lower()
+    if '/market/' in normalized or normalized.endswith('market/pytorch'):
+        return 'market'
+    if '/duke/' in normalized or normalized.endswith('duke/pytorch'):
+        return 'duke'
+    if '/msmt/' in normalized or normalized.endswith('msmt/pytorch'):
+        return 'msmt'
+    if '/cub/' in normalized or normalized.endswith('cub/pytorch'):
+        return 'cub'
+    if '/vehicleid/' in normalized or normalized.endswith('vehicleid/pytorch'):
+        return 'vehicleid'
+    if '/veri/' in normalized or normalized.endswith('veri/pytorch'):
+        return 'veri'
+    if '/viper/' in normalized or normalized.endswith('viper/pytorch'):
+        return 'viper'
+    print(f"[WARN] cannot infer dataset tag from test_dir={path}, fallback to 'unknown'")
+    return 'unknown'
+
+
 ###load config###
 # load the training config
 config_path = os.path.join('./model',opt.name,'opts.yaml')
@@ -100,6 +120,10 @@ str_ids = opt.gpu_ids.split(',')
 #which_epoch = opt.which_epoch
 name = opt.name
 test_dir = opt.test_dir
+dataset_tag = infer_dataset_tag(test_dir)
+model_dir = os.path.join('./model', name)
+result_mat_path = os.path.join(model_dir, f'pytorch_result_{dataset_tag}.mat')
+multi_mat_path = os.path.join(model_dir, f'multi_query_{dataset_tag}.mat')
 
 gpu_ids = []
 for str_id in str_ids:
@@ -389,11 +413,19 @@ time_elapsed = time.time() - since
 print(f"feature extraction complete in {format_duration(time_elapsed)}")
 # Save to Matlab for check
 result = {'gallery_f':gallery_feature.numpy(),'gallery_label':gallery_label,'gallery_cam':gallery_cam,'query_f':query_feature.numpy(),'query_label':query_label,'query_cam':query_cam}
-scipy.io.savemat('pytorch_result.mat',result)
+scipy.io.savemat(result_mat_path,result)
+if opt.multi:
+    multi_result = {'mquery_f':mquery_feature.numpy(),'mquery_label':mquery_label,'mquery_cam':mquery_cam}
+    scipy.io.savemat(multi_mat_path,multi_result)
 
 print(f"run={opt.name}")
-result = './model/%s/result.txt'%opt.name
-eval_cmd = 'python evaluate_gpu.py | tee -a %s'%result
+result_txt_path = './model/%s/result.txt'%opt.name
+eval_cmd = f'python evaluate_gpu.py --result_mat "{result_mat_path}"'
+if opt.multi:
+    eval_cmd += f' --multi_mat "{multi_mat_path}"'
+if run_id:
+    eval_cmd += f' --run_id "{run_id}"'
+eval_cmd += f' | tee -a "{result_txt_path}"'
 eval_return_code = 0
 if opt.skip_eval:
     print("skip evaluation (--skip_eval)")
@@ -402,7 +434,7 @@ else:
     eval_return_code = os.system(eval_cmd)
 print(
     f"done | elapsed={format_duration(time_elapsed)} | "
-    f"result_mat=pytorch_result.mat | result_txt={result} | "
+    f"result_mat={result_mat_path} | result_txt={result_txt_path} | "
     f"eval_skipped={bool(opt.skip_eval)} | evaluate_return={eval_return_code}"
 )
 
@@ -415,8 +447,9 @@ lark_log(
         "run_name": name,
         "which_epoch": opt.which_epoch,
         "elapsed_seconds": float(time_elapsed),
-        "result_mat": "pytorch_result.mat",
-        "result_txt": result,
+        "result_mat": result_mat_path,
+        "multi_mat": multi_mat_path if opt.multi else "",
+        "result_txt": result_txt_path,
         "eval_cmd": eval_cmd,
         "eval_skipped": bool(opt.skip_eval),
         "eval_return_code": int(eval_return_code),
@@ -431,13 +464,9 @@ lark_notify(
         f"run={name}, which_epoch={opt.which_epoch}\n"
         f"run_id={run_id}\n"
         f"elapsed={int(time_elapsed//60)}m{time_elapsed%60:.2f}s\n"
-        f"result_mat=pytorch_result.mat\n"
-        f"result_txt={result}\n"
+        f"result_mat={result_mat_path}\n"
+        f"result_txt={result_txt_path}\n"
         f"eval_skipped={bool(opt.skip_eval)}\n"
         f"evaluate_return={eval_return_code}"
     ),
 )
-
-if opt.multi:
-    result = {'mquery_f':mquery_feature.numpy(),'mquery_label':mquery_label,'mquery_cam':mquery_cam}
-    scipy.io.savemat('multi_query.mat',result)

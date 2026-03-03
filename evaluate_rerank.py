@@ -2,6 +2,7 @@ import scipy.io
 import torch
 import numpy as np
 import time
+import argparse
 from  re_ranking import re_ranking
 from datetime import datetime
 #######################################################################
@@ -52,7 +53,11 @@ def compute_mAP(index, good_index, junk_index):
     return ap, cmc
 
 ######################################################################
-result = scipy.io.loadmat('pytorch_result.mat')
+parser = argparse.ArgumentParser(description='Evaluate Re-ranking')
+parser.add_argument('--result_mat', default='pytorch_result.mat', type=str, help='path to pytorch result mat')
+args = parser.parse_args()
+
+result = scipy.io.loadmat(args.result_mat)
 print(f"Evaluated at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 query_feature = result['query_f']
 query_cam = result['query_cam'][0]
