@@ -269,7 +269,6 @@ if [[ "$confirm_run" != "yes" ]]; then
   exit 0
 fi
 
-result_file="${model_path}/result.txt"
 dataset_tag="$(infer_dataset_tag "$test_dir")"
 result_mat="${model_path}/pytorch_result_${dataset_tag}.mat"
 multi_mat="${model_path}/multi_query_${dataset_tag}.mat"
@@ -297,11 +296,11 @@ if [[ "$eval_mode" == "normal" ]]; then
 else
   eval_cmd=(python "$eval_script" --result_mat "$result_mat")
 fi
-"${eval_cmd[@]}" | tee -a "$result_file"
+"${eval_cmd[@]}"
 
 ui_success "Evaluation completed successfully."
 echo "==================== Artifacts ===================="
-echo "result    : ${result_file}"
+echo "result    : ${model_path}/result.txt"
 echo "result mat: ${result_mat}"
 echo "model dir : ${model_path}"
 echo "run_id    : ${run_id}"

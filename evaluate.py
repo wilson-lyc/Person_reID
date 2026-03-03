@@ -1,12 +1,21 @@
 import argparse
 import os
-from datetime import datetime
+import time
 
 import numpy as np
 import scipy.io
 import torch
 
 from tool.lark import lark_log, lark_notify
+from tool.eval_result_format import (
+    append_result_txt,
+    build_result_block,
+    format_elapsed,
+    format_torch_size,
+    infer_eval_dataset,
+    infer_model_name,
+    now_str,
+)
 from tool.run_id import generate_run_id
 
 #######################################################################
@@ -68,9 +77,9 @@ parser.add_argument('--run_id', default='', type=str, help='external run id for 
 args = parser.parse_args()
 
 run_id = args.run_id.strip() or generate_run_id()
-print(f"Evaluated at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 result = scipy.io.loadmat(args.result_mat)
+since = time.time()
 query_feature = result['query_f']
 query_cam = result['query_cam'][0]
 query_label = result['query_label'][0]
@@ -104,7 +113,6 @@ for i in range(len(query_label)):
         continue
     CMC = CMC + CMC_tmp
     ap += ap_tmp
-    print(i, CMC_tmp[0])
 
 CMC = CMC.float()
 CMC = CMC/len(query_label) #average CMC
@@ -112,7 +120,6 @@ rank1 = float(CMC[0].item())
 rank5 = float(CMC[4].item())
 rank10 = float(CMC[9].item())
 map_score = float(ap/len(query_label))
-print('Rank@1:%f Rank@5:%f Rank@10:%f mAP:%f'%(rank1, rank5, rank10, map_score))
 
 # multiple-query
 CMC = torch.IntTensor(len(gallery_label)).zero_()
@@ -139,7 +146,32 @@ if multi:
     multi_rank5 = float(CMC[4].item())
     multi_rank10 = float(CMC[9].item())
     multi_map = float(ap/len(query_label))
-    print('multi Rank@1:%f Rank@5:%f Rank@10:%f mAP:%f'%(multi_rank1, multi_rank5, multi_rank10, multi_map))
+time_elapsed = time.time() - since
+evaluated_at = now_str()
+model_name = infer_model_name(args.result_mat)
+eval_dataset = infer_eval_dataset(args.result_mat)
+elapsed_text = format_elapsed(time_elapsed)
+extra_metric_lines = []
+if multi and multi_rank1 is not None:
+    extra_metric_lines.append(
+        f"multi Rank@1:{multi_rank1:.6f} Rank@5:{multi_rank5:.6f} "
+        f"Rank@10:{multi_rank10:.6f} mAP:{multi_map:.6f}"
+    )
+result_block = build_result_block(
+    evaluated_at=evaluated_at,
+    model_name=model_name,
+    eval_dataset=eval_dataset,
+    result_mat=os.path.basename(args.result_mat),
+    elapsed_text=elapsed_text,
+    feature_shape_text=format_torch_size(query_feature.shape),
+    rank1=rank1,
+    rank5=rank5,
+    rank10=rank10,
+    map_score=map_score,
+    extra_metric_lines=extra_metric_lines,
+)
+print(result_block)
+result_txt_path = append_result_txt(args.result_mat, result_block)
 
 lark_log(
     project="Person_reID",
@@ -158,13 +190,16 @@ lark_log(
         "multi_rank5": multi_rank5,
         "multi_rank10": multi_rank10,
         "multi_mAP": multi_map,
+        "elapsed_seconds": float(time_elapsed),
+        "result_txt": result_txt_path,
     },
 )
 lark_notify(
     title="[Evaluate End] evaluate.py",
     msg=(
         f"run_id={run_id}\n"
-        f"result_mat={args.result_mat}\n"
+        f"model_name={model_name}, eval_dataset={eval_dataset}\n"
+        f"result_mat={os.path.basename(args.result_mat)}\n"
         f"Rank@1={rank1:.6f}, Rank@5={rank5:.6f}, Rank@10={rank10:.6f}, mAP={map_score:.6f}\n"
         f"multi_used={bool(multi)}"
         + (
@@ -172,5 +207,6 @@ lark_notify(
             f"Rank@10={multi_rank10:.6f}, mAP={multi_map:.6f}"
             if multi and multi_rank1 is not None else ""
         )
+        + f"\nelapsed={elapsed_text}\nresult_txt={result_txt_path}"
     ),
 )

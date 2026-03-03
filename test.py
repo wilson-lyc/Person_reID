@@ -425,7 +425,6 @@ if opt.multi:
     eval_cmd += f' --multi_mat "{multi_mat_path}"'
 if run_id:
     eval_cmd += f' --run_id "{run_id}"'
-eval_cmd += f' | tee -a "{result_txt_path}"'
 eval_return_code = 0
 if opt.skip_eval:
     print("skip evaluation (--skip_eval)")
