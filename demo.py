@@ -62,16 +62,17 @@ def style_axis(ax, edge_color, edge_width):
 
 
 def add_caption(ax, text, color=COLOR_TEXT, size=FONT_CAPTION):
-    """Add centered caption under image card."""
+    """Add centered caption inside image card to avoid clipping."""
     ax.text(
         0.5,
-        -0.085,
+        0.03,
         text,
         transform=ax.transAxes,
         ha='center',
-        va='top',
+        va='bottom',
         fontsize=size,
         color=color,
+        bbox=dict(facecolor='white', edgecolor='none', alpha=0.72, boxstyle='round,pad=0.2'),
     )
 
 ######################################################################
