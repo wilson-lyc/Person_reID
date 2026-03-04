@@ -8,6 +8,12 @@ opt = parser.parse_args()
 
 download_path = opt.path
 
+
+def is_valid_image_file(filename):
+    lower = filename.lower()
+    # Ignore notebook checkpoint artifacts like "*-checkpoint.jpg".
+    return lower.endswith('.jpg') and not lower.endswith('-checkpoint.jpg')
+
 save_path = download_path + '/pytorch'
 if not os.path.isdir(save_path):
     os.mkdir(save_path)
@@ -20,10 +26,10 @@ if not os.path.isdir(query_save_path):
 
 for root, dirs, files in os.walk(query_path, topdown=True):
     for name in files:
-        if not name[-3:]=='jpg':
+        if not is_valid_image_file(name):
             continue
         ID  = name.split('_')
-        src_path = query_path + '/' + name
+        src_path = os.path.join(root, name)
         dst_path = query_save_path + '/' + ID[0] 
         if not os.path.isdir(dst_path):
             os.mkdir(dst_path)
@@ -40,10 +46,10 @@ if os.path.isdir(query_path):
 
     for root, dirs, files in os.walk(query_path, topdown=True):
         for name in files:
-            if not name[-3:]=='jpg':
+            if not is_valid_image_file(name):
                 continue
             ID  = name.split('_')
-            src_path = query_path + '/' + name
+            src_path = os.path.join(root, name)
             dst_path = query_save_path + '/' + ID[0]
             if not os.path.isdir(dst_path):
                 os.mkdir(dst_path)
@@ -58,10 +64,10 @@ if not os.path.isdir(gallery_save_path):
 
 for root, dirs, files in os.walk(gallery_path, topdown=True):
     for name in files:
-        if not name[-3:]=='jpg':
+        if not is_valid_image_file(name):
             continue
         ID  = name.split('_')
-        src_path = gallery_path + '/' + name
+        src_path = os.path.join(root, name)
         dst_path = gallery_save_path + '/' + ID[0]
         if not os.path.isdir(dst_path):
             os.mkdir(dst_path)
@@ -76,10 +82,10 @@ if not os.path.isdir(train_save_path):
 
 for root, dirs, files in os.walk(train_path, topdown=True):
     for name in files:
-        if not name[-3:]=='jpg':
+        if not is_valid_image_file(name):
             continue
         ID  = name.split('_')
-        src_path = train_path + '/' + name
+        src_path = os.path.join(root, name)
         dst_path = train_save_path + '/' + ID[0]
         if not os.path.isdir(dst_path):
             os.mkdir(dst_path)
@@ -97,10 +103,10 @@ if not os.path.isdir(train_save_path):
 
 for root, dirs, files in os.walk(train_path, topdown=True):
     for name in files:
-        if not name[-3:]=='jpg':
+        if not is_valid_image_file(name):
             continue
         ID  = name.split('_')
-        src_path = train_path + '/' + name
+        src_path = os.path.join(root, name)
         dst_path = train_save_path + '/' + ID[0]
         if not os.path.isdir(dst_path):
             os.mkdir(dst_path)
