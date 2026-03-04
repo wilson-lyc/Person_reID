@@ -7,7 +7,25 @@ from torchvision import datasets
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
-FONT_SIZE = 11
+
+###############################################################################
+# Visualization style (clean scientific style)
+COLOR_BG = '#FFFFFF'
+COLOR_TEXT = '#1F2937'
+COLOR_HIT = '#1F8A4C'
+COLOR_MISS = '#C83D3D'
+COLOR_QUERY = '#2F6DB3'
+COLOR_BORDER = '#D5DBE3'
+COLOR_STRIP_BG = '#F5F7FA'
+
+FONT_TITLE = 16
+FONT_SUBTITLE = 11
+FONT_CARD_TITLE = 10
+FONT_CAPTION = 10
+
+CARD_BORDER_WIDTH = 2.0
+CARD_BORDER_WIDTH_LIGHT = 1.2
+TOPK = 10
 #######################################################################
 # Evaluate
 parser = argparse.ArgumentParser(description='Demo')
@@ -24,10 +42,37 @@ image_datasets = {x: datasets.ImageFolder( os.path.join(data_dir,x) ) for x in [
 def imshow(path, title=None):
     """Imshow for Tensor."""
     im = plt.imread(path)
-    plt.imshow(im)
+    ax = plt.gca()
+    ax.imshow(im)
     if title is not None:
-        plt.title(title, fontsize=FONT_SIZE)
+        ax.set_title(title, fontsize=FONT_CARD_TITLE, color=COLOR_TEXT)
     plt.pause(0.001)  # pause a bit so that plots are updated
+
+
+def style_axis(ax, edge_color, edge_width):
+    """Apply a unified card style to an axis."""
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+    for spine in ax.spines.values():
+        spine.set_visible(True)
+        spine.set_linewidth(edge_width)
+        spine.set_edgecolor(edge_color)
+    ax.set_facecolor(COLOR_BG)
+
+
+def add_caption(ax, text, color=COLOR_TEXT, size=FONT_CAPTION):
+    """Add centered caption under image card."""
+    ax.text(
+        0.5,
+        -0.10,
+        text,
+        transform=ax.transAxes,
+        ha='center',
+        va='top',
+        fontsize=size,
+        color=color,
+    )
 
 ######################################################################
 result = scipy.io.loadmat(opts.result_mat)
@@ -123,6 +168,7 @@ topk_count = min(10, len(index))
 ncols = 11
 target_rows = max(1, int(np.ceil(len(target_idx) / ncols)))
 grid_rows = 2 + target_rows
+topk_hits = int(np.sum(gallery_label[index[:topk_count]] == query_pid))
 output_filename = f"{model_id}_{query_index}_{query_pid}.png"
 print(f"result_mat: {opts.result_mat}")
 print(f"query_index: {query_index}")
@@ -135,65 +181,83 @@ for target_gallery_idx in target_idx:
     target_img_path, _ = image_datasets['gallery'].imgs[int(target_gallery_idx)]
     print(target_img_path)
 print('Top 10 images are as follow:')
-fig = plt.figure(figsize=(max(14, ncols * 1.2), 2.9 + target_rows * 2.35))
-fig.subplots_adjust(left=0.01, right=0.99, top=0.94, bottom=0.06, wspace=0.03, hspace=0.06)
+fig = plt.figure(figsize=(max(15, ncols * 1.26), 3.3 + target_rows * 2.45), facecolor=COLOR_BG)
+fig.subplots_adjust(left=0.02, right=0.985, top=0.88, bottom=0.05, wspace=0.07, hspace=0.12)
 grid = fig.add_gridspec(grid_rows, ncols, height_ratios=[1.0, 0.30] + [1.0] * target_rows)
+fig.suptitle(f'ReID Retrieval Demo ({model_id})', fontsize=FONT_TITLE, color=COLOR_TEXT, y=0.965)
+summary_line = (
+    f'Query ID: {query_pid} | Camera: {query_camera} | '
+    f'Target Count: {len(target_idx)} | Top{topk_count} Hits: {topk_hits}'
+)
+fig.text(0.5, 0.925, summary_line, ha='center', va='center', fontsize=FONT_SUBTITLE, color=COLOR_TEXT)
 try: # Visualize Ranking Result 
     # Graphical User Interface is needed
     query_ax = fig.add_subplot(grid[0, 0])
-    query_ax.axis('off')
-    imshow(query_path,'query')
-    query_ax.text(0.5, -0.08, f'ID: {query_pid}', transform=query_ax.transAxes, ha='center', va='top', fontsize=FONT_SIZE)
+    imshow(query_path)
+    style_axis(query_ax, COLOR_QUERY, CARD_BORDER_WIDTH)
+    query_ax.set_title('Query', fontsize=FONT_CARD_TITLE, color=COLOR_QUERY, pad=6)
+    add_caption(query_ax, f'ID:{query_pid}  CAM:{query_camera}', color=COLOR_TEXT)
     for rank_i in range(topk_count):
         ax = fig.add_subplot(grid[0, rank_i + 1])
-        ax.axis('off')
         img_path, _ = image_datasets['gallery'].imgs[index[rank_i]]
         label = int(gallery_label[index[rank_i]])
         imshow(img_path)
-        id_color = 'green' if label == query_pid else 'red'
-        ax.text(0.5, -0.08, f'ID: {label}', transform=ax.transAxes, ha='center', va='top', color=id_color, fontsize=FONT_SIZE)
-        ax.set_title('%d'%(rank_i+1), fontsize=FONT_SIZE)
+        matched = label == query_pid
+        rank_color = COLOR_HIT if matched else COLOR_MISS
+        style_axis(ax, rank_color, CARD_BORDER_WIDTH)
+        ax.set_title(f'Rank {rank_i + 1}', fontsize=FONT_CARD_TITLE, color=rank_color, pad=6)
+        add_caption(ax, f'ID:{label}', color=rank_color)
         print(img_path)
     for empty_col in range(topk_count + 1, ncols):
         ax = fig.add_subplot(grid[0, empty_col])
+        style_axis(ax, COLOR_BORDER, CARD_BORDER_WIDTH_LIGHT)
         ax.axis('off')
 
-    first_target_ax = None
+    strip_ax = fig.add_subplot(grid[1, :])
+    strip_ax.set_facecolor(COLOR_STRIP_BG)
+    style_axis(strip_ax, COLOR_BORDER, CARD_BORDER_WIDTH_LIGHT)
+    strip_ax.text(
+        0.5,
+        0.5,
+        f'Target Images (same ID, different camera) - {len(target_idx)}',
+        ha='center',
+        va='center',
+        fontsize=FONT_CARD_TITLE,
+        color=COLOR_TEXT,
+    )
 
     if len(target_idx) > 0:
         for target_i, target_gallery_idx in enumerate(target_idx):
             target_row = target_i // ncols
             target_col = target_i % ncols
             ax = fig.add_subplot(grid[target_row + 2, target_col])
-            ax.axis('off')
-            if first_target_ax is None:
-                first_target_ax = ax
             img_path, _ = image_datasets['gallery'].imgs[int(target_gallery_idx)]
             imshow(img_path)
+            style_axis(ax, COLOR_BORDER, CARD_BORDER_WIDTH_LIGHT)
         for empty_slot in range(len(target_idx), target_rows * ncols):
             target_row = empty_slot // ncols
             target_col = empty_slot % ncols
             ax = fig.add_subplot(grid[target_row + 2, target_col])
+            style_axis(ax, COLOR_BORDER, CARD_BORDER_WIDTH_LIGHT)
             ax.axis('off')
     else:
         ax = fig.add_subplot(grid[2, 0])
-        ax.axis('off')
-        first_target_ax = ax
-        ax.text(0.5, 0.5, 'No target in gallery (different camera)', transform=ax.transAxes, ha='center', va='center', fontsize=FONT_SIZE)
+        style_axis(ax, COLOR_BORDER, CARD_BORDER_WIDTH_LIGHT)
+        ax.set_facecolor(COLOR_STRIP_BG)
+        ax.text(
+            0.5,
+            0.5,
+            'No target in gallery (different camera)',
+            transform=ax.transAxes,
+            ha='center',
+            va='center',
+            fontsize=FONT_CARD_TITLE,
+            color=COLOR_TEXT,
+        )
         for empty_col in range(1, ncols):
             ax = fig.add_subplot(grid[2, empty_col])
+            style_axis(ax, COLOR_BORDER, CARD_BORDER_WIDTH_LIGHT)
             ax.axis('off')
-
-    title_y = (query_ax.get_position().y0 + first_target_ax.get_position().y1) / 2.0 - 0.01
-    fig.text(
-        0.5,
-        title_y,
-        f'Target images (ID: {query_pid})',
-        ha='center',
-        va='center',
-        fontsize=FONT_SIZE,
-        color='black',
-    )
 except RuntimeError:
     for rank_i in range(topk_count):
         img_path = image_datasets['gallery'].imgs[index[rank_i]]
