@@ -121,7 +121,7 @@ target_idx = np.setdiff1d(same_id_idx, same_cam_idx, assume_unique=False)
 topk_count = min(10, len(index))
 ncols = 11
 target_rows = max(1, int(np.ceil(len(target_idx) / ncols)))
-total_rows = 1 + target_rows
+grid_rows = 2 + target_rows
 output_filename = f"{model_id}_{query_index}_{query_pid}.png"
 print(f"result_mat: {opts.result_mat}")
 print(f"query_index: {query_index}")
@@ -134,16 +134,17 @@ for target_gallery_idx in target_idx:
     target_img_path, _ = image_datasets['gallery'].imgs[int(target_gallery_idx)]
     print(target_img_path)
 print('Top 10 images are as follow:')
-fig = plt.figure(figsize=(max(14, ncols * 1.25), 3.6 + target_rows * 2.9))
-fig.subplots_adjust(left=0.01, right=0.99, top=0.92, bottom=0.08, wspace=0.05, hspace=0.35)
+fig = plt.figure(figsize=(max(14, ncols * 1.25), 3.4 + target_rows * 2.6))
+fig.subplots_adjust(left=0.01, right=0.99, top=0.92, bottom=0.08, wspace=0.05, hspace=0.12)
+grid = fig.add_gridspec(grid_rows, ncols, height_ratios=[1.0, 0.22] + [1.0] * target_rows)
 try: # Visualize Ranking Result 
     # Graphical User Interface is needed
-    query_ax = plt.subplot(total_rows, ncols, 1)
+    query_ax = fig.add_subplot(grid[0, 0])
     query_ax.axis('off')
     imshow(query_path,'query')
     query_ax.text(0.5, -0.08, f'ID: {query_pid}', transform=query_ax.transAxes, ha='center', va='top')
     for rank_i in range(topk_count):
-        ax = plt.subplot(total_rows, ncols, rank_i + 2)
+        ax = fig.add_subplot(grid[0, rank_i + 1])
         ax.axis('off')
         img_path, _ = image_datasets['gallery'].imgs[index[rank_i]]
         label = int(gallery_label[index[rank_i]])
@@ -153,7 +154,7 @@ try: # Visualize Ranking Result
         ax.set_title('%d'%(rank_i+1))
         print(img_path)
     for empty_col in range(topk_count + 1, ncols):
-        ax = plt.subplot(total_rows, ncols, empty_col + 1)
+        ax = fig.add_subplot(grid[0, empty_col])
         ax.axis('off')
 
     first_target_ax = None
@@ -162,35 +163,31 @@ try: # Visualize Ranking Result
         for target_i, target_gallery_idx in enumerate(target_idx):
             target_row = target_i // ncols
             target_col = target_i % ncols
-            subplot_idx = (target_row + 1) * ncols + target_col + 1
-            ax = plt.subplot(total_rows, ncols, subplot_idx)
+            ax = fig.add_subplot(grid[target_row + 2, target_col])
             ax.axis('off')
             if first_target_ax is None:
                 first_target_ax = ax
             img_path, _ = image_datasets['gallery'].imgs[int(target_gallery_idx)]
             imshow(img_path)
-            label = int(gallery_label[int(target_gallery_idx)])
-            ax.text(0.5, -0.08, f'ID: {label}', transform=ax.transAxes, ha='center', va='top', color='green')
         for empty_slot in range(len(target_idx), target_rows * ncols):
             target_row = empty_slot // ncols
             target_col = empty_slot % ncols
-            subplot_idx = (target_row + 1) * ncols + target_col + 1
-            ax = plt.subplot(total_rows, ncols, subplot_idx)
+            ax = fig.add_subplot(grid[target_row + 2, target_col])
             ax.axis('off')
     else:
-        ax = plt.subplot(total_rows, ncols, ncols + 1)
+        ax = fig.add_subplot(grid[2, 0])
         ax.axis('off')
         first_target_ax = ax
         ax.text(0.5, 0.5, 'No target in gallery (different camera)', transform=ax.transAxes, ha='center', va='center')
         for empty_col in range(1, ncols):
-            ax = plt.subplot(total_rows, ncols, ncols + empty_col + 1)
+            ax = fig.add_subplot(grid[2, empty_col])
             ax.axis('off')
 
-    title_y = (query_ax.get_position().y0 + first_target_ax.get_position().y1) / 2.0
+    title_y = (query_ax.get_position().y0 + first_target_ax.get_position().y1) / 2.0 - 0.01
     fig.text(
         0.5,
         title_y,
-        'Target images',
+        f'Target images (ID: {query_pid})',
         ha='center',
         va='center',
         fontsize=10,
