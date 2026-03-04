@@ -7,6 +7,7 @@ from torchvision import datasets
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
+FONT_SIZE = 12
 #######################################################################
 # Evaluate
 parser = argparse.ArgumentParser(description='Demo')
@@ -25,7 +26,7 @@ def imshow(path, title=None):
     im = plt.imread(path)
     plt.imshow(im)
     if title is not None:
-        plt.title(title)
+        plt.title(title, fontsize=FONT_SIZE)
     plt.pause(0.001)  # pause a bit so that plots are updated
 
 ######################################################################
@@ -134,15 +135,15 @@ for target_gallery_idx in target_idx:
     target_img_path, _ = image_datasets['gallery'].imgs[int(target_gallery_idx)]
     print(target_img_path)
 print('Top 10 images are as follow:')
-fig = plt.figure(figsize=(max(14, ncols * 1.25), 3.4 + target_rows * 2.6))
-fig.subplots_adjust(left=0.01, right=0.99, top=0.92, bottom=0.08, wspace=0.05, hspace=0.12)
-grid = fig.add_gridspec(grid_rows, ncols, height_ratios=[1.0, 0.22] + [1.0] * target_rows)
+fig = plt.figure(figsize=(max(14, ncols * 1.2), 2.9 + target_rows * 2.35))
+fig.subplots_adjust(left=0.01, right=0.99, top=0.94, bottom=0.06, wspace=0.03, hspace=0.06)
+grid = fig.add_gridspec(grid_rows, ncols, height_ratios=[1.0, 0.30] + [1.0] * target_rows)
 try: # Visualize Ranking Result 
     # Graphical User Interface is needed
     query_ax = fig.add_subplot(grid[0, 0])
     query_ax.axis('off')
     imshow(query_path,'query')
-    query_ax.text(0.5, -0.08, f'ID: {query_pid}', transform=query_ax.transAxes, ha='center', va='top')
+    query_ax.text(0.5, -0.08, f'ID: {query_pid}', transform=query_ax.transAxes, ha='center', va='top', fontsize=FONT_SIZE)
     for rank_i in range(topk_count):
         ax = fig.add_subplot(grid[0, rank_i + 1])
         ax.axis('off')
@@ -150,8 +151,8 @@ try: # Visualize Ranking Result
         label = int(gallery_label[index[rank_i]])
         imshow(img_path)
         id_color = 'green' if label == query_pid else 'red'
-        ax.text(0.5, -0.08, f'ID: {label}', transform=ax.transAxes, ha='center', va='top', color=id_color)
-        ax.set_title('%d'%(rank_i+1))
+        ax.text(0.5, -0.08, f'ID: {label}', transform=ax.transAxes, ha='center', va='top', color=id_color, fontsize=FONT_SIZE)
+        ax.set_title('%d'%(rank_i+1), fontsize=FONT_SIZE)
         print(img_path)
     for empty_col in range(topk_count + 1, ncols):
         ax = fig.add_subplot(grid[0, empty_col])
@@ -178,7 +179,7 @@ try: # Visualize Ranking Result
         ax = fig.add_subplot(grid[2, 0])
         ax.axis('off')
         first_target_ax = ax
-        ax.text(0.5, 0.5, 'No target in gallery (different camera)', transform=ax.transAxes, ha='center', va='center')
+        ax.text(0.5, 0.5, 'No target in gallery (different camera)', transform=ax.transAxes, ha='center', va='center', fontsize=FONT_SIZE)
         for empty_col in range(1, ncols):
             ax = fig.add_subplot(grid[2, empty_col])
             ax.axis('off')
@@ -190,7 +191,7 @@ try: # Visualize Ranking Result
         f'Target images (ID: {query_pid})',
         ha='center',
         va='center',
-        fontsize=10,
+        fontsize=FONT_SIZE,
         color='black',
     )
 except RuntimeError:
