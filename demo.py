@@ -115,36 +115,70 @@ index = sort_img(
 query_path, _ = image_datasets['query'].imgs[query_index]
 query_pid = int(query_label[query_index])
 query_camera = int(query_cam[query_index])
+same_id_idx = np.argwhere(gallery_label == query_pid).flatten()
+same_cam_idx = np.argwhere(gallery_cam == query_camera).flatten()
+target_idx = np.setdiff1d(same_id_idx, same_cam_idx, assume_unique=False)
+topk_count = min(10, len(index))
+ncols = max(11, len(target_idx))
 output_filename = f"{model_id}_{query_index}_{query_pid}.png"
 print(f"result_mat: {opts.result_mat}")
 print(f"query_index: {query_index}")
 print(f"query_id: {query_pid}")
 print(f"query_cam: {query_camera}")
 print(f"query_img: {query_path}")
+print(f"target_count: {len(target_idx)}")
+print("target_imgs:")
+for target_gallery_idx in target_idx:
+    target_img_path, _ = image_datasets['gallery'].imgs[int(target_gallery_idx)]
+    print(target_img_path)
 print('Top 10 images are as follow:')
-fig = plt.figure(figsize=(14, 3.2))
+fig = plt.figure(figsize=(max(14, ncols * 1.25), 6.0))
 try: # Visualize Ranking Result 
     # Graphical User Interface is needed
-    ax = plt.subplot(1,11,1)
+    ax = plt.subplot(2, ncols, 1)
     ax.axis('off')
     imshow(query_path,'query')
     ax.text(0.5, -0.08, f'ID: {query_pid}', transform=ax.transAxes, ha='center', va='top')
-    for rank_i in range(10):
-        ax = plt.subplot(1,11,rank_i+2)
+    for rank_i in range(topk_count):
+        ax = plt.subplot(2, ncols, rank_i + 2)
         ax.axis('off')
         img_path, _ = image_datasets['gallery'].imgs[index[rank_i]]
         label = int(gallery_label[index[rank_i]])
         imshow(img_path)
         id_color = 'green' if label == query_pid else 'red'
         ax.text(0.5, -0.08, f'ID: {label}', transform=ax.transAxes, ha='center', va='top', color=id_color)
-        if label == query_pid:
-            ax.set_title('%d'%(rank_i+1))
-        else:
-            ax.set_title('%d'%(rank_i+1))
+        ax.set_title('%d'%(rank_i+1))
         print(img_path)
+    for empty_col in range(topk_count + 1, ncols):
+        ax = plt.subplot(2, ncols, empty_col + 1)
+        ax.axis('off')
+
+    if len(target_idx) > 0:
+        for target_i, target_gallery_idx in enumerate(target_idx):
+            ax = plt.subplot(2, ncols, ncols + target_i + 1)
+            ax.axis('off')
+            img_path, _ = image_datasets['gallery'].imgs[int(target_gallery_idx)]
+            imshow(img_path)
+            label = int(gallery_label[int(target_gallery_idx)])
+            ax.text(0.5, -0.08, f'ID: {label}', transform=ax.transAxes, ha='center', va='top', color='green')
+            ax.set_title(f'T{target_i + 1}')
+    else:
+        ax = plt.subplot(2, ncols, ncols + 1)
+        ax.axis('off')
+        ax.text(0.5, 0.5, 'No target in gallery (different camera)', transform=ax.transAxes, ha='center', va='center')
+
+    for empty_col in range(len(target_idx), ncols):
+        if len(target_idx) == 0 and empty_col == 0:
+            continue
+        ax = plt.subplot(2, ncols, ncols + empty_col + 1)
+        ax.axis('off')
 except RuntimeError:
-    for rank_i in range(10):
-        img_path = image_datasets.imgs[index[rank_i]]
+    for rank_i in range(topk_count):
+        img_path = image_datasets['gallery'].imgs[index[rank_i]]
+        print(img_path[0])
+    print("target_imgs:")
+    for target_gallery_idx in target_idx:
+        img_path = image_datasets['gallery'].imgs[int(target_gallery_idx)]
         print(img_path[0])
     print('If you want to see the visualization of the ranking result, graphical user interface is needed.')
 
