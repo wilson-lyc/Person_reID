@@ -119,7 +119,9 @@ same_id_idx = np.argwhere(gallery_label == query_pid).flatten()
 same_cam_idx = np.argwhere(gallery_cam == query_camera).flatten()
 target_idx = np.setdiff1d(same_id_idx, same_cam_idx, assume_unique=False)
 topk_count = min(10, len(index))
-ncols = max(11, len(target_idx))
+ncols = 11
+target_rows = max(1, int(np.ceil(len(target_idx) / ncols)))
+total_rows = 1 + target_rows
 output_filename = f"{model_id}_{query_index}_{query_pid}.png"
 print(f"result_mat: {opts.result_mat}")
 print(f"query_index: {query_index}")
@@ -132,15 +134,15 @@ for target_gallery_idx in target_idx:
     target_img_path, _ = image_datasets['gallery'].imgs[int(target_gallery_idx)]
     print(target_img_path)
 print('Top 10 images are as follow:')
-fig = plt.figure(figsize=(max(14, ncols * 1.25), 6.8))
+fig = plt.figure(figsize=(max(14, ncols * 1.25), 3.6 + target_rows * 2.9))
 try: # Visualize Ranking Result 
     # Graphical User Interface is needed
-    ax = plt.subplot(2, ncols, 1)
+    ax = plt.subplot(total_rows, ncols, 1)
     ax.axis('off')
     imshow(query_path,'query')
     ax.text(0.5, -0.08, f'ID: {query_pid}', transform=ax.transAxes, ha='center', va='top')
     for rank_i in range(topk_count):
-        ax = plt.subplot(2, ncols, rank_i + 2)
+        ax = plt.subplot(total_rows, ncols, rank_i + 2)
         ax.axis('off')
         img_path, _ = image_datasets['gallery'].imgs[index[rank_i]]
         label = int(gallery_label[index[rank_i]])
@@ -150,12 +152,12 @@ try: # Visualize Ranking Result
         ax.set_title('%d'%(rank_i+1))
         print(img_path)
     for empty_col in range(topk_count + 1, ncols):
-        ax = plt.subplot(2, ncols, empty_col + 1)
+        ax = plt.subplot(total_rows, ncols, empty_col + 1)
         ax.axis('off')
 
     fig.text(
         0.5,
-        0.505,
+        1.0 - (1.0 / total_rows) + 0.01,
         'Target images',
         ha='center',
         va='center',
@@ -165,22 +167,28 @@ try: # Visualize Ranking Result
 
     if len(target_idx) > 0:
         for target_i, target_gallery_idx in enumerate(target_idx):
-            ax = plt.subplot(2, ncols, ncols + target_i + 1)
+            target_row = target_i // ncols
+            target_col = target_i % ncols
+            subplot_idx = (target_row + 1) * ncols + target_col + 1
+            ax = plt.subplot(total_rows, ncols, subplot_idx)
             ax.axis('off')
             img_path, _ = image_datasets['gallery'].imgs[int(target_gallery_idx)]
             imshow(img_path)
             label = int(gallery_label[int(target_gallery_idx)])
             ax.text(0.5, -0.08, f'ID: {label}', transform=ax.transAxes, ha='center', va='top', color='green')
+        for empty_slot in range(len(target_idx), target_rows * ncols):
+            target_row = empty_slot // ncols
+            target_col = empty_slot % ncols
+            subplot_idx = (target_row + 1) * ncols + target_col + 1
+            ax = plt.subplot(total_rows, ncols, subplot_idx)
+            ax.axis('off')
     else:
-        ax = plt.subplot(2, ncols, ncols + 1)
+        ax = plt.subplot(total_rows, ncols, ncols + 1)
         ax.axis('off')
         ax.text(0.5, 0.5, 'No target in gallery (different camera)', transform=ax.transAxes, ha='center', va='center')
-
-    for empty_col in range(len(target_idx), ncols):
-        if len(target_idx) == 0 and empty_col == 0:
-            continue
-        ax = plt.subplot(2, ncols, ncols + empty_col + 1)
-        ax.axis('off')
+        for empty_col in range(1, ncols):
+            ax = plt.subplot(total_rows, ncols, ncols + empty_col + 1)
+            ax.axis('off')
 except RuntimeError:
     for rank_i in range(topk_count):
         img_path = image_datasets['gallery'].imgs[index[rank_i]]
@@ -192,6 +200,6 @@ except RuntimeError:
     print('If you want to see the visualization of the ranking result, graphical user interface is needed.')
 
 # Save the figure
-fig.subplots_adjust(left=0.01, right=0.99, top=0.92, bottom=0.10, wspace=0.05, hspace=0.30)
+fig.subplots_adjust(left=0.01, right=0.99, top=0.92, bottom=0.08, wspace=0.05, hspace=0.35)
 fig.savefig(output_filename, bbox_inches='tight', pad_inches=0.03)
 print(f"saved_figure: {output_filename}")
