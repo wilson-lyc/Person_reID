@@ -7,7 +7,7 @@ from torchvision import datasets
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
-FONT_SIZE = 12
+FONT_SIZE = 11
 #######################################################################
 # Evaluate
 parser = argparse.ArgumentParser(description='Demo')
