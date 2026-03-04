@@ -75,6 +75,15 @@ def add_caption(ax, text, color=COLOR_TEXT, size=FONT_CAPTION):
         bbox=dict(facecolor='white', edgecolor='none', alpha=0.72, boxstyle='round,pad=0.2'),
     )
 
+
+def parse_id_cam_from_path(path):
+    filename = os.path.basename(path)
+    label_str = filename[0:4]
+    camera_str = filename.split('c')[1][0]
+    label = -1 if label_str.startswith('-1') else int(label_str)
+    camera = int(camera_str)
+    return label, camera
+
 ######################################################################
 result = scipy.io.loadmat(opts.result_mat)
 query_feature = torch.FloatTensor(result['query_f'])
@@ -163,6 +172,14 @@ index = sort_img(
 query_path, _ = image_datasets['query'].imgs[query_index]
 query_pid = int(query_label[query_index])
 query_camera = int(query_cam[query_index])
+path_pid, path_camera = parse_id_cam_from_path(query_path)
+if path_pid != query_pid or path_camera != query_camera:
+    raise RuntimeError(
+        "query mapping mismatch: result_mat does not match current test_dir/query order. "
+        f"index={query_index}, mat(id={query_pid}, cam={query_camera}), "
+        f"path={query_path}, path(id={path_pid}, cam={path_camera}). "
+        "Please regenerate result_mat with this exact --test_dir."
+    )
 same_id_idx = np.argwhere(gallery_label == query_pid).flatten()
 same_cam_idx = np.argwhere(gallery_cam == query_camera).flatten()
 target_idx = np.setdiff1d(same_id_idx, same_cam_idx, assume_unique=False)
