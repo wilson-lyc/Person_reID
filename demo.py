@@ -39,7 +39,12 @@ gallery_label = result['gallery_label'][0]
 
 result_dir = os.path.dirname(opts.result_mat) or '.'
 result_base = os.path.basename(opts.result_mat)
-model_id = os.path.basename(os.path.normpath(result_dir)) if result_dir not in ('', '.') else os.path.splitext(result_base)[0]
+model_name = os.path.basename(os.path.normpath(result_dir)) if result_dir not in ('', '.') else os.path.splitext(result_base)[0]
+name_parts = model_name.split('_')
+if len(name_parts) >= 2 and len(name_parts[0]) == 4 and len(name_parts[1]) == 6 and name_parts[0].isdigit() and name_parts[1].isdigit():
+    model_id = f"{name_parts[0]}_{name_parts[1]}"
+else:
+    model_id = model_name
 dataset_suffix = ''
 if result_base.startswith('pytorch_result_') and result_base.endswith('.mat'):
     dataset_suffix = result_base[len('pytorch_result_'):-len('.mat')]
@@ -92,19 +97,27 @@ def sort_img(qf, ql, qc, gf, gl, gc):
     index = index[mask]
     return index
 
-i = opts.query_index
-if i < 0 or i >= len(query_label):
-    raise ValueError(f"query_index out of range: {i}, expected 0~{len(query_label)-1}")
-index = sort_img(query_feature[i],query_label[i],query_cam[i],gallery_feature,gallery_label,gallery_cam)
+query_index = opts.query_index
+if query_index < 0 or query_index >= len(query_label):
+    raise ValueError(f"query_index out of range: {query_index}, expected 0~{len(query_label)-1}")
+index = sort_img(
+    query_feature[query_index],
+    query_label[query_index],
+    query_cam[query_index],
+    gallery_feature,
+    gallery_label,
+    gallery_cam,
+)
 
 ########################################################################
 # Visualize the rank result
 
-query_path, _ = image_datasets['query'].imgs[i]
-query_pid = int(query_label[i])
-query_camera = int(query_cam[i])
+query_path, _ = image_datasets['query'].imgs[query_index]
+query_pid = int(query_label[query_index])
+query_camera = int(query_cam[query_index])
+output_filename = f"{model_id}_{query_index}_{query_pid}.png"
 print(f"result_mat: {opts.result_mat}")
-print(f"query_index: {i}")
+print(f"query_index: {query_index}")
 print(f"query_id: {query_pid}")
 print(f"query_cam: {query_camera}")
 print(f"query_img: {query_path}")
@@ -116,27 +129,26 @@ try: # Visualize Ranking Result
     ax.axis('off')
     imshow(query_path,'query')
     ax.text(0.5, -0.08, f'ID: {query_pid}', transform=ax.transAxes, ha='center', va='top')
-    for i in range(10):
-        ax = plt.subplot(1,11,i+2)
+    for rank_i in range(10):
+        ax = plt.subplot(1,11,rank_i+2)
         ax.axis('off')
-        img_path, _ = image_datasets['gallery'].imgs[index[i]]
-        label = int(gallery_label[index[i]])
+        img_path, _ = image_datasets['gallery'].imgs[index[rank_i]]
+        label = int(gallery_label[index[rank_i]])
         imshow(img_path)
         id_color = 'green' if label == query_pid else 'red'
         ax.text(0.5, -0.08, f'ID: {label}', transform=ax.transAxes, ha='center', va='top', color=id_color)
         if label == query_pid:
-            ax.set_title('%d'%(i+1))
+            ax.set_title('%d'%(rank_i+1))
         else:
-            ax.set_title('%d'%(i+1))
+            ax.set_title('%d'%(rank_i+1))
         print(img_path)
 except RuntimeError:
-    for i in range(10):
-        img_path = image_datasets.imgs[index[i]]
+    for rank_i in range(10):
+        img_path = image_datasets.imgs[index[rank_i]]
         print(img_path[0])
     print('If you want to see the visualization of the ranking result, graphical user interface is needed.')
 
+# Save the figure
 fig.subplots_adjust(left=0.01, right=0.99, top=0.92, bottom=0.16, wspace=0.05)
-output_filename = f"{model_id}_{i}_{query_pid}.png"
-output_path = os.path.join(result_dir, output_filename)
-fig.savefig(output_path, bbox_inches='tight', pad_inches=0.03)
-print(f"saved_figure: {output_path}")
+fig.savefig(output_filename, bbox_inches='tight', pad_inches=0.03)
+print(f"saved_figure: {output_filename}")
