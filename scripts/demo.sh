@@ -81,10 +81,6 @@ if ! build_model_candidates; then
   ui_tip "Run test.py first to generate result mats."
   exit 1
 fi
-if [[ ${#SKIPPED_MODELS[@]} -gt 0 ]]; then
-  ui_warn "Skipped model dirs without result mat: ${SKIPPED_MODELS[*]}"
-fi
-
 model_choice=""
 model_label=""
 default_model_idx="${#MODEL_NAMES[@]}"

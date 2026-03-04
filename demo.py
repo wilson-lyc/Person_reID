@@ -167,7 +167,7 @@ target_idx = np.setdiff1d(same_id_idx, same_cam_idx, assume_unique=False)
 topk_count = min(10, len(index))
 ncols = 11
 target_rows = max(1, int(np.ceil(len(target_idx) / ncols)))
-grid_rows = 2 + target_rows
+grid_rows = 3 + target_rows
 topk_hits = int(np.sum(gallery_label[index[:topk_count]] == query_pid))
 output_filename = f"{model_id}_{query_index}_{query_pid}.png"
 print(f"result_mat: {opts.result_mat}")
@@ -179,26 +179,37 @@ print(f"target_count: {len(target_idx)}")
 print("target_imgs:")
 for target_gallery_idx in target_idx:
     target_img_path, _ = image_datasets['gallery'].imgs[int(target_gallery_idx)]
-    print(target_img_path)
+print(target_img_path)
 print('Top 10 images are as follow:')
 fig = plt.figure(figsize=(max(14.2, ncols * 1.18), 2.85 + target_rows * 2.20), facecolor=COLOR_BG)
-fig.subplots_adjust(left=0.018, right=0.988, top=0.90, bottom=0.04, wspace=0.045, hspace=0.08)
-grid = fig.add_gridspec(grid_rows, ncols, height_ratios=[1.0, 0.20] + [1.0] * target_rows)
-fig.suptitle('Person ReID Demo', fontsize=FONT_TITLE, color=COLOR_TEXT, y=0.955)
+fig.subplots_adjust(left=0.018, right=0.988, top=0.92, bottom=0.04, wspace=0.045, hspace=0.08)
+grid = fig.add_gridspec(grid_rows, ncols, height_ratios=[0.20, 1.0, 0.20] + [1.0] * target_rows)
+fig.suptitle('Person ReID Demo', fontsize=FONT_TITLE, color=COLOR_TEXT, y=0.97)
 summary_line = (
     f'Query ID: {query_pid} | '
     f'Target Count: {len(target_idx)} | Top{topk_count} Hits: {topk_hits}'
 )
-fig.text(0.5, 0.905, summary_line, ha='center', va='center', fontsize=FONT_SUBTITLE, color=COLOR_TEXT)
 try: # Visualize Ranking Result 
     # Graphical User Interface is needed
-    query_ax = fig.add_subplot(grid[0, 0])
+    summary_ax = fig.add_subplot(grid[0, :])
+    summary_ax.axis('off')
+    summary_ax.text(
+        0.5,
+        0.5,
+        summary_line,
+        ha='center',
+        va='center',
+        fontsize=FONT_SUBTITLE,
+        color=COLOR_TEXT,
+    )
+
+    query_ax = fig.add_subplot(grid[1, 0])
     imshow(query_path)
     style_axis(query_ax, COLOR_QUERY, CARD_BORDER_WIDTH)
     query_ax.set_title('Query', fontsize=FONT_CARD_TITLE, color=COLOR_QUERY, pad=4)
     add_caption(query_ax, f'ID:{query_pid}  CAM:{query_camera}', color=COLOR_TEXT)
     for rank_i in range(topk_count):
-        ax = fig.add_subplot(grid[0, rank_i + 1])
+        ax = fig.add_subplot(grid[1, rank_i + 1])
         img_path, _ = image_datasets['gallery'].imgs[index[rank_i]]
         label = int(gallery_label[index[rank_i]])
         imshow(img_path)
@@ -209,11 +220,11 @@ try: # Visualize Ranking Result
         add_caption(ax, f'ID:{label}', color=rank_color)
         print(img_path)
     for empty_col in range(topk_count + 1, ncols):
-        ax = fig.add_subplot(grid[0, empty_col])
+        ax = fig.add_subplot(grid[1, empty_col])
         style_axis(ax, COLOR_BORDER, CARD_BORDER_WIDTH_LIGHT)
         ax.axis('off')
 
-    strip_ax = fig.add_subplot(grid[1, :])
+    strip_ax = fig.add_subplot(grid[2, :])
     strip_ax.set_facecolor(COLOR_STRIP_BG)
     style_axis(strip_ax, COLOR_BORDER, CARD_BORDER_WIDTH_LIGHT)
     strip_ax.text(
@@ -230,18 +241,18 @@ try: # Visualize Ranking Result
         for target_i, target_gallery_idx in enumerate(target_idx):
             target_row = target_i // ncols
             target_col = target_i % ncols
-            ax = fig.add_subplot(grid[target_row + 2, target_col])
+            ax = fig.add_subplot(grid[target_row + 3, target_col])
             img_path, _ = image_datasets['gallery'].imgs[int(target_gallery_idx)]
             imshow(img_path)
             style_axis(ax, COLOR_BORDER, CARD_BORDER_WIDTH_LIGHT)
         for empty_slot in range(len(target_idx), target_rows * ncols):
             target_row = empty_slot // ncols
             target_col = empty_slot % ncols
-            ax = fig.add_subplot(grid[target_row + 2, target_col])
+            ax = fig.add_subplot(grid[target_row + 3, target_col])
             style_axis(ax, COLOR_BORDER, CARD_BORDER_WIDTH_LIGHT)
             ax.axis('off')
     else:
-        ax = fig.add_subplot(grid[2, 0])
+        ax = fig.add_subplot(grid[3, 0])
         style_axis(ax, COLOR_BORDER, CARD_BORDER_WIDTH_LIGHT)
         ax.set_facecolor(COLOR_STRIP_BG)
         ax.text(
@@ -255,7 +266,7 @@ try: # Visualize Ranking Result
             color=COLOR_TEXT,
         )
         for empty_col in range(1, ncols):
-            ax = fig.add_subplot(grid[2, empty_col])
+            ax = fig.add_subplot(grid[3, empty_col])
             style_axis(ax, COLOR_BORDER, CARD_BORDER_WIDTH_LIGHT)
             ax.axis('off')
 except RuntimeError:
