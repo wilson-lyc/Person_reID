@@ -155,7 +155,7 @@ try: # Visualize Ranking Result
 
     fig.text(
         0.5,
-        0.49,
+        0.505,
         'Target images',
         ha='center',
         va='center',
@@ -170,16 +170,6 @@ try: # Visualize Ranking Result
             img_path, _ = image_datasets['gallery'].imgs[int(target_gallery_idx)]
             imshow(img_path)
             label = int(gallery_label[int(target_gallery_idx)])
-            ax.text(
-                0.5,
-                0.98,
-                f'T{target_i + 1}',
-                transform=ax.transAxes,
-                ha='center',
-                va='top',
-                color='black',
-                bbox=dict(boxstyle='round,pad=0.15', fc='white', ec='none', alpha=0.8),
-            )
             ax.text(0.5, -0.08, f'ID: {label}', transform=ax.transAxes, ha='center', va='top', color='green')
     else:
         ax = plt.subplot(2, ncols, ncols + 1)
@@ -202,6 +192,6 @@ except RuntimeError:
     print('If you want to see the visualization of the ranking result, graphical user interface is needed.')
 
 # Save the figure
-fig.subplots_adjust(left=0.01, right=0.99, top=0.92, bottom=0.10, wspace=0.05, hspace=0.18)
+fig.subplots_adjust(left=0.01, right=0.99, top=0.92, bottom=0.10, wspace=0.05, hspace=0.30)
 fig.savefig(output_filename, bbox_inches='tight', pad_inches=0.03)
 print(f"saved_figure: {output_filename}")
