@@ -65,7 +65,7 @@ def add_caption(ax, text, color=COLOR_TEXT, size=FONT_CAPTION):
     """Add centered caption under image card."""
     ax.text(
         0.5,
-        -0.10,
+        -0.085,
         text,
         transform=ax.transAxes,
         ha='center',
@@ -181,21 +181,21 @@ for target_gallery_idx in target_idx:
     target_img_path, _ = image_datasets['gallery'].imgs[int(target_gallery_idx)]
     print(target_img_path)
 print('Top 10 images are as follow:')
-fig = plt.figure(figsize=(max(15, ncols * 1.26), 3.3 + target_rows * 2.45), facecolor=COLOR_BG)
-fig.subplots_adjust(left=0.02, right=0.985, top=0.88, bottom=0.05, wspace=0.07, hspace=0.12)
-grid = fig.add_gridspec(grid_rows, ncols, height_ratios=[1.0, 0.30] + [1.0] * target_rows)
-fig.suptitle(f'ReID Retrieval Demo ({model_id})', fontsize=FONT_TITLE, color=COLOR_TEXT, y=0.965)
+fig = plt.figure(figsize=(max(14.2, ncols * 1.18), 2.85 + target_rows * 2.20), facecolor=COLOR_BG)
+fig.subplots_adjust(left=0.018, right=0.988, top=0.90, bottom=0.04, wspace=0.045, hspace=0.08)
+grid = fig.add_gridspec(grid_rows, ncols, height_ratios=[1.0, 0.20] + [1.0] * target_rows)
+fig.suptitle('Person ReID Demo', fontsize=FONT_TITLE, color=COLOR_TEXT, y=0.955)
 summary_line = (
-    f'Query ID: {query_pid} | Camera: {query_camera} | '
+    f'Query ID: {query_pid} | '
     f'Target Count: {len(target_idx)} | Top{topk_count} Hits: {topk_hits}'
 )
-fig.text(0.5, 0.925, summary_line, ha='center', va='center', fontsize=FONT_SUBTITLE, color=COLOR_TEXT)
+fig.text(0.5, 0.905, summary_line, ha='center', va='center', fontsize=FONT_SUBTITLE, color=COLOR_TEXT)
 try: # Visualize Ranking Result 
     # Graphical User Interface is needed
     query_ax = fig.add_subplot(grid[0, 0])
     imshow(query_path)
     style_axis(query_ax, COLOR_QUERY, CARD_BORDER_WIDTH)
-    query_ax.set_title('Query', fontsize=FONT_CARD_TITLE, color=COLOR_QUERY, pad=6)
+    query_ax.set_title('Query', fontsize=FONT_CARD_TITLE, color=COLOR_QUERY, pad=4)
     add_caption(query_ax, f'ID:{query_pid}  CAM:{query_camera}', color=COLOR_TEXT)
     for rank_i in range(topk_count):
         ax = fig.add_subplot(grid[0, rank_i + 1])
@@ -205,7 +205,7 @@ try: # Visualize Ranking Result
         matched = label == query_pid
         rank_color = COLOR_HIT if matched else COLOR_MISS
         style_axis(ax, rank_color, CARD_BORDER_WIDTH)
-        ax.set_title(f'Rank {rank_i + 1}', fontsize=FONT_CARD_TITLE, color=rank_color, pad=6)
+        ax.set_title(f'Rank {rank_i + 1}', fontsize=FONT_CARD_TITLE, color=rank_color, pad=4)
         add_caption(ax, f'ID:{label}', color=rank_color)
         print(img_path)
     for empty_col in range(topk_count + 1, ncols):
