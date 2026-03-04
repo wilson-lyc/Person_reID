@@ -179,7 +179,7 @@ print(f"target_count: {len(target_idx)}")
 print("target_imgs:")
 for target_gallery_idx in target_idx:
     target_img_path, _ = image_datasets['gallery'].imgs[int(target_gallery_idx)]
-print(target_img_path)
+    print(target_img_path)
 print('Top 10 images are as follow:')
 fig = plt.figure(figsize=(max(14.2, ncols * 1.18), 2.85 + target_rows * 2.20), facecolor=COLOR_BG)
 fig.subplots_adjust(left=0.018, right=0.988, top=0.95, bottom=0.04, wspace=0.045, hspace=0.08)
