@@ -121,11 +121,12 @@ try: # Visualize Ranking Result
         img_path, _ = image_datasets['gallery'].imgs[index[i]]
         label = int(gallery_label[index[i]])
         imshow(img_path)
-        ax.text(0.5, -0.08, f'ID: {label}', transform=ax.transAxes, ha='center', va='top')
+        id_color = 'green' if label == query_pid else 'red'
+        ax.text(0.5, -0.08, f'ID: {label}', transform=ax.transAxes, ha='center', va='top', color=id_color)
         if label == query_pid:
-            ax.set_title('%d'%(i+1), color='green')
+            ax.set_title('%d'%(i+1))
         else:
-            ax.set_title('%d'%(i+1), color='red')
+            ax.set_title('%d'%(i+1))
         print(img_path)
 except RuntimeError:
     for i in range(10):
