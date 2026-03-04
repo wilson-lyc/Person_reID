@@ -333,6 +333,8 @@ def get_id(img_path):
 
 gallery_path = image_datasets['gallery'].imgs
 query_path = image_datasets['query'].imgs
+gallery_path_list = [p for p, _ in gallery_path]
+query_path_list = [p for p, _ in query_path]
 
 gallery_cam,gallery_label = get_id(gallery_path)
 query_cam,query_label = get_id(query_path)
@@ -412,7 +414,16 @@ with torch.no_grad():
 time_elapsed = time.time() - since
 print(f"feature extraction complete in {format_duration(time_elapsed)}")
 # Save to Matlab for check
-result = {'gallery_f':gallery_feature.numpy(),'gallery_label':gallery_label,'gallery_cam':gallery_cam,'query_f':query_feature.numpy(),'query_label':query_label,'query_cam':query_cam}
+result = {
+    'gallery_f': gallery_feature.numpy(),
+    'gallery_label': gallery_label,
+    'gallery_cam': gallery_cam,
+    'query_f': query_feature.numpy(),
+    'query_label': query_label,
+    'query_cam': query_cam,
+    'gallery_path': np.array(gallery_path_list, dtype=object),
+    'query_path': np.array(query_path_list, dtype=object),
+}
 scipy.io.savemat(result_mat_path,result)
 if opt.multi:
     multi_result = {'mquery_f':mquery_feature.numpy(),'mquery_label':mquery_label,'mquery_cam':mquery_cam}

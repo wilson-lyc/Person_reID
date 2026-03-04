@@ -84,6 +84,35 @@ def parse_id_cam_from_path(path):
     camera = int(camera_str)
     return label, camera
 
+
+def load_path_list_from_mat(result_dict, key):
+    if key not in result_dict:
+        return None
+    arr = np.array(result_dict[key]).squeeze()
+    if arr.size == 0:
+        return None
+
+    def _to_str(x):
+        if isinstance(x, bytes):
+            return x.decode('utf-8', errors='ignore')
+        if isinstance(x, str):
+            return x
+        if isinstance(x, np.ndarray):
+            if x.dtype.kind in ('U', 'S'):
+                return ''.join(x.tolist())
+            if x.size == 1:
+                return _to_str(x.item())
+            flat = x.flatten().tolist()
+            return ''.join(str(v) for v in flat)
+        return str(x)
+
+    if isinstance(arr, np.ndarray):
+        flat = arr.flatten()
+        out = [_to_str(v) for v in flat]
+    else:
+        out = [_to_str(arr)]
+    return out
+
 ######################################################################
 result = scipy.io.loadmat(opts.result_mat)
 query_feature = torch.FloatTensor(result['query_f'])
@@ -92,6 +121,8 @@ query_label = result['query_label'][0]
 gallery_feature = torch.FloatTensor(result['gallery_f'])
 gallery_cam = result['gallery_cam'][0]
 gallery_label = result['gallery_label'][0]
+mat_query_paths = load_path_list_from_mat(result, 'query_path')
+mat_gallery_paths = load_path_list_from_mat(result, 'gallery_path')
 
 result_dir = os.path.dirname(opts.result_mat) or '.'
 result_base = os.path.basename(opts.result_mat)
@@ -169,17 +200,21 @@ index = sort_img(
 ########################################################################
 # Visualize the rank result
 
-query_path, _ = image_datasets['query'].imgs[query_index]
+if mat_query_paths is not None and query_index < len(mat_query_paths):
+    query_path = mat_query_paths[query_index]
+else:
+    query_path, _ = image_datasets['query'].imgs[query_index]
 query_pid = int(query_label[query_index])
 query_camera = int(query_cam[query_index])
-path_pid, path_camera = parse_id_cam_from_path(query_path)
-if path_pid != query_pid or path_camera != query_camera:
-    raise RuntimeError(
-        "query mapping mismatch: result_mat does not match current test_dir/query order. "
-        f"index={query_index}, mat(id={query_pid}, cam={query_camera}), "
-        f"path={query_path}, path(id={path_pid}, cam={path_camera}). "
-        "Please regenerate result_mat with this exact --test_dir."
-    )
+if mat_query_paths is None:
+    path_pid, path_camera = parse_id_cam_from_path(query_path)
+    if path_pid != query_pid or path_camera != query_camera:
+        raise RuntimeError(
+            "query mapping mismatch: result_mat does not match current test_dir/query order. "
+            f"index={query_index}, mat(id={query_pid}, cam={query_camera}), "
+            f"path={query_path}, path(id={path_pid}, cam={path_camera}). "
+            "Please regenerate result_mat with this exact --test_dir."
+        )
 same_id_idx = np.argwhere(gallery_label == query_pid).flatten()
 same_cam_idx = np.argwhere(gallery_cam == query_camera).flatten()
 target_idx = np.setdiff1d(same_id_idx, same_cam_idx, assume_unique=False)
@@ -197,7 +232,10 @@ print(f"query_img: {query_path}")
 print(f"target_count: {len(target_idx)}")
 print("target_imgs:")
 for target_gallery_idx in target_idx:
-    target_img_path, _ = image_datasets['gallery'].imgs[int(target_gallery_idx)]
+    if mat_gallery_paths is not None and int(target_gallery_idx) < len(mat_gallery_paths):
+        target_img_path = mat_gallery_paths[int(target_gallery_idx)]
+    else:
+        target_img_path, _ = image_datasets['gallery'].imgs[int(target_gallery_idx)]
     print(target_img_path)
 print('Top 10 images are as follow:')
 fig = plt.figure(figsize=(max(14.2, ncols * 1.18), 2.85 + target_rows * 2.20), facecolor=COLOR_BG)
@@ -230,7 +268,10 @@ try: # Visualize Ranking Result
     add_caption(query_ax, f'ID:{query_pid}', color=COLOR_TEXT)
     for rank_i in range(topk_count):
         ax = fig.add_subplot(grid[1, rank_i + 1])
-        img_path, _ = image_datasets['gallery'].imgs[index[rank_i]]
+        if mat_gallery_paths is not None and int(index[rank_i]) < len(mat_gallery_paths):
+            img_path = mat_gallery_paths[int(index[rank_i])]
+        else:
+            img_path, _ = image_datasets['gallery'].imgs[index[rank_i]]
         label = int(gallery_label[index[rank_i]])
         imshow(img_path)
         matched = label == query_pid
@@ -262,7 +303,10 @@ try: # Visualize Ranking Result
             target_row = target_i // ncols
             target_col = target_i % ncols
             ax = fig.add_subplot(grid[target_row + 3, target_col])
-            img_path, _ = image_datasets['gallery'].imgs[int(target_gallery_idx)]
+            if mat_gallery_paths is not None and int(target_gallery_idx) < len(mat_gallery_paths):
+                img_path = mat_gallery_paths[int(target_gallery_idx)]
+            else:
+                img_path, _ = image_datasets['gallery'].imgs[int(target_gallery_idx)]
             imshow(img_path)
             style_axis(ax, COLOR_BORDER, CARD_BORDER_WIDTH_LIGHT)
             target_cam = int(gallery_cam[int(target_gallery_idx)])
@@ -293,12 +337,20 @@ try: # Visualize Ranking Result
             ax.axis('off')
 except RuntimeError:
     for rank_i in range(topk_count):
-        img_path = image_datasets['gallery'].imgs[index[rank_i]]
-        print(img_path[0])
+        if mat_gallery_paths is not None and int(index[rank_i]) < len(mat_gallery_paths):
+            img_path = mat_gallery_paths[int(index[rank_i])]
+            print(img_path)
+        else:
+            img_path = image_datasets['gallery'].imgs[index[rank_i]]
+            print(img_path[0])
     print("target_imgs:")
     for target_gallery_idx in target_idx:
-        img_path = image_datasets['gallery'].imgs[int(target_gallery_idx)]
-        print(img_path[0])
+        if mat_gallery_paths is not None and int(target_gallery_idx) < len(mat_gallery_paths):
+            img_path = mat_gallery_paths[int(target_gallery_idx)]
+            print(img_path)
+        else:
+            img_path = image_datasets['gallery'].imgs[int(target_gallery_idx)]
+            print(img_path[0])
     print('If you want to see the visualization of the ranking result, graphical user interface is needed.')
 
 # Save the figure
