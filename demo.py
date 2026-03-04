@@ -230,7 +230,7 @@ try: # Visualize Ranking Result
     strip_ax.text(
         0.5,
         0.5,
-        f'Target Images (same ID, different camera) - {len(target_idx)}',
+        f'Target Images - {len(target_idx)}',
         ha='center',
         va='center',
         fontsize=FONT_CARD_TITLE,
