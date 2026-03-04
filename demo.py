@@ -156,7 +156,7 @@ try: # Visualize Ranking Result
     fig.text(
         0.5,
         0.49,
-        'Target images (same ID, different camera)',
+        'Target images',
         ha='center',
         va='center',
         fontsize=10,
