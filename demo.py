@@ -132,7 +132,7 @@ for target_gallery_idx in target_idx:
     target_img_path, _ = image_datasets['gallery'].imgs[int(target_gallery_idx)]
     print(target_img_path)
 print('Top 10 images are as follow:')
-fig = plt.figure(figsize=(max(14, ncols * 1.25), 6.0))
+fig = plt.figure(figsize=(max(14, ncols * 1.25), 6.8))
 try: # Visualize Ranking Result 
     # Graphical User Interface is needed
     ax = plt.subplot(2, ncols, 1)
@@ -153,6 +153,16 @@ try: # Visualize Ranking Result
         ax = plt.subplot(2, ncols, empty_col + 1)
         ax.axis('off')
 
+    fig.text(
+        0.5,
+        0.49,
+        'Target images (same ID, different camera)',
+        ha='center',
+        va='center',
+        fontsize=10,
+        color='black',
+    )
+
     if len(target_idx) > 0:
         for target_i, target_gallery_idx in enumerate(target_idx):
             ax = plt.subplot(2, ncols, ncols + target_i + 1)
@@ -160,8 +170,17 @@ try: # Visualize Ranking Result
             img_path, _ = image_datasets['gallery'].imgs[int(target_gallery_idx)]
             imshow(img_path)
             label = int(gallery_label[int(target_gallery_idx)])
+            ax.text(
+                0.5,
+                0.98,
+                f'T{target_i + 1}',
+                transform=ax.transAxes,
+                ha='center',
+                va='top',
+                color='black',
+                bbox=dict(boxstyle='round,pad=0.15', fc='white', ec='none', alpha=0.8),
+            )
             ax.text(0.5, -0.08, f'ID: {label}', transform=ax.transAxes, ha='center', va='top', color='green')
-            ax.set_title(f'T{target_i + 1}')
     else:
         ax = plt.subplot(2, ncols, ncols + 1)
         ax.axis('off')
@@ -183,6 +202,6 @@ except RuntimeError:
     print('If you want to see the visualization of the ranking result, graphical user interface is needed.')
 
 # Save the figure
-fig.subplots_adjust(left=0.01, right=0.99, top=0.92, bottom=0.16, wspace=0.05)
+fig.subplots_adjust(left=0.01, right=0.99, top=0.92, bottom=0.10, wspace=0.05, hspace=0.18)
 fig.savefig(output_filename, bbox_inches='tight', pad_inches=0.03)
 print(f"saved_figure: {output_filename}")
