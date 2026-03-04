@@ -164,13 +164,4 @@ max_query_index=$((query_count - 1))
 ui_info "Query index range: 0 ~ ${max_query_index}"
 ui_input query_index "query_index" "0" '^[0-9]+$' "v >= 0 && v < ${query_count}" "Invalid query_index: expected 0 ~ ${max_query_index}."
 
-echo "================ Demo configuration ================"
-echo "model_name    : ${name}"
-echo "result_mat    : ${selected_mat}"
-echo "dataset_tag   : ${dataset_tag}"
-echo "test_dir      : ${test_dir}"
-echo "query_index   : ${query_index}"
-echo "query_count   : ${query_count}"
-echo "===================================================="
-
 python demo.py --result_mat "$selected_mat" --test_dir "$test_dir" --query_index "$query_index"
