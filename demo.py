@@ -32,7 +32,6 @@ parser = argparse.ArgumentParser(description='Demo')
 parser.add_argument('--query_index', default=777, type=int, help='test_image_index')
 parser.add_argument('--test_dir',default='../Market/pytorch',type=str, help='./test_data')
 parser.add_argument('--result_mat', default='pytorch_result.mat', type=str, help='path to pytorch result mat')
-parser.add_argument('--query_dir', default='', type=str, help='raw query dir (index space). e.g. ../Market/query')
 opts = parser.parse_args()
 
 data_dir = opts.test_dir
@@ -146,53 +145,9 @@ def sort_img(qf, ql, qc, gf, gl, gc):
     return index
 
 
-def parse_query_filename(path):
-    filename = os.path.basename(path)
-    label_str = filename[0:4]
-    camera_str = filename.split('c')[1][0]
-    label = -1 if label_str.startswith('-1') else int(label_str)
-    camera = int(camera_str)
-    return filename, label, camera
-
-
-def resolve_query_index(raw_query_index, ds_query_imgs, q_labels, q_cams):
-    if raw_query_index < 0:
-        raise ValueError(f"query_index must be >=0, got {raw_query_index}")
-
-    auto_query_dir = os.path.normpath(os.path.join(opts.test_dir, '..', 'query'))
-    query_dir = opts.query_dir if opts.query_dir else auto_query_dir
-
-    if not os.path.isdir(query_dir):
-        if raw_query_index >= len(q_labels):
-            raise ValueError(f"query_index out of range: {raw_query_index}, expected 0~{len(q_labels)-1}")
-        return raw_query_index, None
-
-    raw_files = []
-    for f in sorted(os.listdir(query_dir)):
-        p = os.path.join(query_dir, f)
-        if os.path.isfile(p):
-            raw_files.append(p)
-    if raw_query_index >= len(raw_files):
-        raise ValueError(f"query_index out of range in raw query dir: {raw_query_index}, expected 0~{len(raw_files)-1}")
-
-    raw_path = raw_files[raw_query_index]
-    raw_name, raw_label, raw_cam = parse_query_filename(raw_path)
-
-    # Primary: exact filename matching against pytorch/query images.
-    name_to_idx = {os.path.basename(p): i for i, (p, _) in enumerate(ds_query_imgs)}
-    if raw_name in name_to_idx:
-        mapped = name_to_idx[raw_name]
-        return mapped, raw_path
-
-    # Fallback: match by (label, camera) if filename is unavailable.
-    candidates = np.argwhere((q_labels == raw_label) & (q_cams == raw_cam)).flatten()
-    if len(candidates) == 1:
-        return int(candidates[0]), raw_path
-    raise RuntimeError(f"failed to map raw query index {raw_query_index} ({raw_name}) to result mat query list")
-
-
-raw_query_index = opts.query_index
-query_index, raw_query_path = resolve_query_index(raw_query_index, image_datasets['query'].imgs, query_label, query_cam)
+query_index = opts.query_index
+if query_index < 0 or query_index >= len(query_label):
+    raise ValueError(f"query_index out of range: {query_index}, expected 0~{len(query_label)-1}")
 index = sort_img(
     query_feature[query_index],
     query_label[query_index],
@@ -218,13 +173,10 @@ grid_rows = 3 + target_rows
 topk_hits = int(np.sum(gallery_label[index[:topk_count]] == query_pid))
 output_filename = f"{model_id}_{query_index}_{query_pid}.png"
 print(f"result_mat: {opts.result_mat}")
-print(f"query_index(raw): {raw_query_index}")
-print(f"query_index(mapped): {query_index}")
+print(f"query_index: {query_index}")
 print(f"query_id: {query_pid}")
 print(f"query_cam: {query_camera}")
-if raw_query_path is not None:
-    print(f"query_img_raw: {raw_query_path}")
-print(f"query_img_mapped: {query_path}")
+print(f"query_img: {query_path}")
 print(f"target_count: {len(target_idx)}")
 print("target_imgs:")
 for target_gallery_idx in target_idx:
