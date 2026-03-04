@@ -209,7 +209,7 @@ try: # Visualize Ranking Result
     imshow(query_path)
     style_axis(query_ax, COLOR_QUERY, CARD_BORDER_WIDTH)
     query_ax.set_title('Query', fontsize=FONT_CARD_TITLE, color=COLOR_QUERY, pad=4)
-    add_caption(query_ax, f'ID:{query_pid}  CAM:{query_camera}', color=COLOR_TEXT)
+    add_caption(query_ax, f'ID:{query_pid}', color=COLOR_TEXT)
     for rank_i in range(topk_count):
         ax = fig.add_subplot(grid[1, rank_i + 1])
         img_path, _ = image_datasets['gallery'].imgs[index[rank_i]]
@@ -247,6 +247,8 @@ try: # Visualize Ranking Result
             img_path, _ = image_datasets['gallery'].imgs[int(target_gallery_idx)]
             imshow(img_path)
             style_axis(ax, COLOR_BORDER, CARD_BORDER_WIDTH_LIGHT)
+            target_cam = int(gallery_cam[int(target_gallery_idx)])
+            add_caption(ax, f'CAM:{target_cam}', color=COLOR_TEXT, size=FONT_CAPTION - 1)
         for empty_slot in range(len(target_idx), target_rows * ncols):
             target_row = empty_slot // ncols
             target_col = empty_slot % ncols
