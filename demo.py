@@ -182,9 +182,9 @@ for target_gallery_idx in target_idx:
 print(target_img_path)
 print('Top 10 images are as follow:')
 fig = plt.figure(figsize=(max(14.2, ncols * 1.18), 2.85 + target_rows * 2.20), facecolor=COLOR_BG)
-fig.subplots_adjust(left=0.018, right=0.988, top=0.92, bottom=0.04, wspace=0.045, hspace=0.08)
+fig.subplots_adjust(left=0.018, right=0.988, top=0.95, bottom=0.04, wspace=0.045, hspace=0.08)
 grid = fig.add_gridspec(grid_rows, ncols, height_ratios=[0.20, 1.0, 0.20] + [1.0] * target_rows)
-fig.suptitle('Person ReID Demo', fontsize=FONT_TITLE, color=COLOR_TEXT, y=0.97)
+fig.suptitle('Person ReID Demo', fontsize=FONT_TITLE, color=COLOR_TEXT, y=0.965)
 summary_line = (
     f'Query ID: {query_pid} | '
     f'Target Count: {len(target_idx)} | Top{topk_count} Hits: {topk_hits}'
