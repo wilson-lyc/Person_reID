@@ -187,6 +187,7 @@ grid = fig.add_gridspec(grid_rows, ncols, height_ratios=[0.20, 1.0, 0.20] + [1.0
 fig.suptitle('Person ReID Demo', fontsize=FONT_TITLE, color=COLOR_TEXT, y=0.965)
 summary_line = (
     f'Query ID: {query_pid} | '
+    f'Query Cam: {query_camera} | '
     f'Target Count: {len(target_idx)} | Top{topk_count} Hits: {topk_hits}'
 )
 try: # Visualize Ranking Result 
