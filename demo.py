@@ -114,12 +114,14 @@ try: # Visualize Ranking Result
     ax = plt.subplot(1,11,1)
     ax.axis('off')
     imshow(query_path,'query')
+    ax.text(0.5, -0.08, f'ID: {query_pid}', transform=ax.transAxes, ha='center', va='top')
     for i in range(10):
         ax = plt.subplot(1,11,i+2)
         ax.axis('off')
         img_path, _ = image_datasets['gallery'].imgs[index[i]]
-        label = gallery_label[index[i]]
+        label = int(gallery_label[index[i]])
         imshow(img_path)
+        ax.text(0.5, -0.08, f'ID: {label}', transform=ax.transAxes, ha='center', va='top')
         if label == query_pid:
             ax.set_title('%d'%(i+1), color='green')
         else:
@@ -131,4 +133,5 @@ except RuntimeError:
         print(img_path[0])
     print('If you want to see the visualization of the ranking result, graphical user interface is needed.')
 
+fig.subplots_adjust(bottom=0.22)
 fig.savefig("show.png")
